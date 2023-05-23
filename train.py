@@ -12,6 +12,7 @@ import paddle.optimizer as optim
 from lr import MYLR
 from paddle.nn import CrossEntropyLoss
 from paddle.metric import accuracy
+from paddle.metric import Recall
 from visualdl import LogWriter
 
 from network import load_model
@@ -25,10 +26,12 @@ def train(train_loader:DataLoader, model:nn.Layer,loss_function, optimizer, epoc
     """
     sumloss=0
     sumacc=0
+    recall=Recall()
     for bid, (batch_image,batch_image_type,batch_image_import_flag) in enumerate(train_loader):
         output=model(batch_image[0])
         loss=loss_function(output,batch_image_type.unsqueeze(1))
         acc = accuracy(output, batch_image_type.unsqueeze(1))
+        recall.update(output.argmax(-1).unsqueeze(1), batch_image_type.unsqueeze(1))
         optimizer.clear_grad()
         loss.backward()
         optimizer.step()
@@ -40,7 +43,8 @@ def train(train_loader:DataLoader, model:nn.Layer,loss_function, optimizer, epoc
         # use `add_scalar` to record scalar values
         writer.add_scalar(tag="train/loss", step=epoch, value=avgloss)
         writer.add_scalar(tag="train/acc", step=epoch, value=avgacc)
-    return {"loss":avgloss,"acc":avgacc,"epoch":epoch}
+        writer.add_scalar(tag="train/recall", step=epoch, value=recall.accumulate())
+    return {"loss":avgloss,"acc":avgacc,"epoch":epoch,"recall":recall.accumulate()}
 
 def eval(test_loader, model:nn.Layer,loss_function, epoch, args):
     """
@@ -48,10 +52,12 @@ def eval(test_loader, model:nn.Layer,loss_function, epoch, args):
     """
     sumloss=0
     sumacc=0
+    recall=Recall()
     for bid ,(batch_image,batch_image_type,batch_image_import_flag) in enumerate(test_loader):
         output=model(batch_image[0])
         loss=loss_function(output,batch_image_type)
         acc = accuracy(output, batch_image_type.unsqueeze(1))
+        recall.update(output.argmax(-1).unsqueeze(1), batch_image_type.unsqueeze(1))
         sumloss+=float(loss)
         avgloss=sumloss/(bid+1)
         
@@ -61,7 +67,9 @@ def eval(test_loader, model:nn.Layer,loss_function, epoch, args):
         # use `add_scalar` to record scalar values
         writer.add_scalar(tag="eval/acc", step=epoch, value=avgacc)
         writer.add_scalar(tag="eval/loss", step=epoch, value=avgloss)
-    return {"loss":avgloss,"acc":avgacc,"epoch":epoch}
+        writer.add_scalar(tag="eval/recall", step=epoch, value=recall.accumulate())
+    return {"loss":avgloss,"acc":avgacc,"epoch":epoch,"recall":recall.accumulate()}
+
 
 def get_dataloader(dataset_dir,expansion,args):
     # 获得数据loader
@@ -125,27 +133,28 @@ def main():
         )
     else:
         paddle.device.set_device('gpu')
-
+    
     # 初始化模型
     encoder_q_model,encoder_k_model=load_model(args.moco_model)# 加载对比模型作为backbone
     cls_model=WordImageSliceMLPCLS(encoder_model_k=encoder_q_model,encoder_model_q=encoder_k_model,freeze_flag=False)
     
     # 加载数据
     train_loader,test_loader=get_dataloader(dataset_dir= args.data,expansion=args.expansion,args=args)
-    lr=MYLR(learning_rate=args.lr,cos=args.cos,verbose=True)
+    args.cos=True
+    lr=MYLR(learning_rate=args.lr,cos=args.cos,verbose=True,schedule=args.schedule,epochs=args.epochs)
     optimizer = optim.SGD(
             learning_rate=lr,
             parameters=cls_model.parameters(),
             weight_decay=args.weight_decay,
      )# pytorch 对应的优化器是SGD
     # 模型训练和评估
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss(weight=paddle.to_tensor([0.35,0.65]))
     for epoch in range(args.start_epoch, args.epochs):
         train_info=train(train_loader, cls_model,loss_function, optimizer, epoch, args)
         print(train_info)
         lr.step(epoch)# 更新一下学习率
         with paddle.no_grad():
-            eval(test_loader,cls_model,loss_function,epoch,args)
+            print("eval",eval(test_loader,cls_model,loss_function,epoch,args))
         if epoch>0 and epoch%args.checkpoint_steps==0:
             checkpoint(cls_model,optimizer,train_info,args.checkpoint)
 #    if global_steps % args.checkpoint_steps == 0:

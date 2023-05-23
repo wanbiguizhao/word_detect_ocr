@@ -5,7 +5,7 @@ class MYLR(optim.lr.LRScheduler):
     自定义的一个学习率曲线
     """
 
-    def __init__(self,learning_rate=0.1,epochs=500, last_epoch=-1, verbose=False,cos=False,schedule=[120, 160]):
+    def __init__(self,learning_rate=0.1,epochs=500, last_epoch=-1, verbose=False,cos=False,schedule=[1, 200]):
         
         self.cos=cos
         self.epochs=epochs# 总共的epoch数量

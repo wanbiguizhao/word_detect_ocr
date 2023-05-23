@@ -1,9 +1,11 @@
+import paddle 
 from paddle.io import Dataset
 import cv2 as cv
 #一种思路是加载一个obj信息。
 class MLPDataset(Dataset):
     def __init__(self,labels_image_info,transform=None):
         super().__init__()
+        #self.image_list=list(map(lambda x:cv.resize(cv.imread(x,cv.IMREAD_GRAYSCALE),[64,16]),labels_image_info["Image_Path"] ))
         self.image_list=list(map(lambda x:cv.imread(x,cv.IMREAD_GRAYSCALE),labels_image_info["Image_Path"] ))
         self.image_type_list=labels_image_info["Image_Type"]
         self.image_import_flag_list=labels_image_info["Import_Flag"]
