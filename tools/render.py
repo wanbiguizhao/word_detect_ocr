@@ -36,5 +36,5 @@ def render_html(word_image_slice_dir):
     image_info_table.append(row_info)
     #print(image_info_table)
     html_data=template.render(image_info_table=image_info_table)
-    with open("{word_image_slice_dir}/imagetable.html",'w') as ith:
+    with open(f"{word_image_slice_dir}/imagetable.html",'w') as ith:
         ith.write(html_data)

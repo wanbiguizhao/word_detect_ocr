@@ -129,31 +129,36 @@ class WIPDataset(Dataset):
         
         #for image_path in tqdm(glob(os.path.join(data_dir,"*","*.png"),recursive=True)[:20]):
         # 需要重新设计一下数据结构。
-        for image_path in sorted(tqdm(glob(os.path.join(data_dir+"*.png"),recursive=True))):
+        for image_path in sorted(tqdm(glob(os.path.join(data_dir+"*.png"),recursive=False))):
+
             image=cv.imread(image_path,cv.IMREAD_GRAYSCALE)
+            
+            h,w=image.shape
+            resize_image=cv.resize(image,(w,64)) #.resize(64,w)# 强制变化为高度是64的情况。
             # 切掉白色的两边
-            blur = cv.GaussianBlur(image,(5,5),0)
+            blur = cv.GaussianBlur(resize_image,(5,5),0)
+
             ret3,th_image = cv.threshold(blur,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
-            h,w=th_image.shape
-            if h>=48:
-                continue 
-            beg_index,end_index=imageStrip(th_image)
-            w=end_index-beg_index+1
-            h_padding=48-h
-            w_padding=(4-w%4)%4
-            top, bottom = h_padding//2, h_padding-(h_padding//2)# 上下部分填充
-            left,right=w_padding//2,w_padding-(w_padding//2)
-            new_image = cv.copyMakeBorder(image[:,beg_index:end_index+1], top, bottom, left, right,cv.BORDER_CONSTANT, value=(255,))
+            # 这块要做一次变化，等比例变成64的高度。
+            
+            #beg_index,end_index=imageStrip(th_image)
+            #w=end_index-beg_index+1
+            #h_padding=48-h
+            #w_padding=(4-w%4)%4
+            #top, bottom = h_padding//2, h_padding-(h_padding//2)# 上下部分填充
+            #left,right=w_padding//2,w_padding-(w_padding//2)
+            
+            new_image = cv.copyMakeBorder(th_image, 0, 0, 8, 8,cv.BORDER_CONSTANT, value=(255,))
             self.image_info["image_path"].append(image_path)
             self.image_info["image"].append(new_image)
-            self.image_info["crop_info"].append([beg_index,end_index])
+            #self.image_info["crop_info"].append([beg_index,end_index])
             # 记录一下图片，然后记录一下，图片切割后的图片例子，
             # new_image_list=[] # 存储一下切割后的
             # image_mapping={}, key 表示的切割的第i个元素， value： { image_index:{这个元素在图片中的索引位置},beg_index:int,end_index:int} 的数据
             for beg,end in splitImage(new_image):
                 self.data_list.append(
                     {
-                        "image_index":len(self.image_info["image"])-1,
+                        "image_index":len(self.image_info["image"])-1,# 记录dataset的index使用的图片是哪个
                         "seg_beg_index":beg,
                         "seg_end_index":end
                     }

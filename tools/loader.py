@@ -45,3 +45,4 @@ def image_transform():
             transforms.ToTensor(),
             normalize,
         ]
+    return TwoCropsTransform(transforms.Compose(augmentation))

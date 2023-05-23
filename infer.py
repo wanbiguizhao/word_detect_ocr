@@ -6,7 +6,12 @@ from data.dataset import WIPByteDataset
 from network import WordImageSliceMLPCLS
 from train import get_dataloader
 from paddle.metric import accuracy
-
+from data.dataset import WIPDataset
+from tools.loader import image_transform
+from tools.render import render_html
+from paddle.io import DataLoader 
+from PIL import Image
+import glob, os
 parser = argparse.ArgumentParser(description="推测一个神经网络")
 parser.add_argument("--data",type=str,default="mocov1/dataset", metavar="DIR", help="path to dataset,指向按行切割的图片的文件夹目录")
 parser.add_argument(
@@ -68,15 +73,47 @@ def test_infer(args):
             avgacc=sumacc/(bid+1)
             print(avgacc)
 
-def fast_infer():
-    from paddle.vision import transforms
-    from paddle.io import DataLoader 
-    from data.dataset import WIPDataset
-    from tools.loader import image_transform
-    from PIL import Image
-    from .tools.render import render_html
+def one_image_infer(image_dir,image_name):
+    # 使用模型对对图片进行预测
+    # 在图片上画出单个汉字。
+    cls_model=load_model()
+    cls_model.eval()
+    model_ds=WIPDataset(data_dir=image_dir,transform=image_transform())
+    train_loader = DataLoader(
+                model_ds,
+                batch_size=256,
+                shuffle=False,
+                num_workers=1,
+                #pin_memory=True, paddle 没有过
+                #sampler=None,
+                drop_last=False,
+            )
+    for f in glob.glob(f"{image_dir}/word_s*.png"):
+        # 删除之前的图片切片
+        os.remove(f)
+    image_index=0
+    for k, (images, _) in enumerate(train_loader):    
+        predict_info=cls_model(images[0])
+        predict_labels=paddle.argmax(predict_info,axis=-1)
+        seg_img_numpy=images[2].numpy()# 这个图片是原始的图片
+        img_len=seg_img_numpy.shape[0]
+        i=0
+        while i< img_len:
+            seg_img=seg_img_numpy[i,:,:]
+            h,w=seg_img.shape
+            seg_img[:,w//2]=0
+            #plt.imshow(seg_img )
+            pil_image=Image.fromarray(seg_img)
+            pil_image.save("{}/words/word_seg_{:04d}_type_{:02d}.png".format(image_dir,image_index,int(predict_labels[i])))
+            image_index+=1
+            i+=1
+    render_html(image_dir)# 生成预测后的数据
+ 
+def fast_infer():    
+    cls_model=load_model()
+    cls_model.eval()
 
-    model_ds=WIPDataset(data_dir="tmp/project_ocrSentences_dataset/1954",transform=image_transform())#这个是模型使用，要对数据做一些变化。
+    model_ds=WIPDataset(data_dir="tmp/project_ocrSentences_dataset/s",transform=image_transform())#这个是模型使用，要对数据做一些变化。
     train_loader = DataLoader(
             model_ds,
             batch_size=256,
@@ -86,14 +123,14 @@ def fast_infer():
             #sampler=None,
             drop_last=False,
         )
-    cls_model=load_model()
+    
     import glob, os
     for f in glob.glob("tmp/project_ocrSentences_dataset/word_image_slice/word_s*.png"):
         os.remove(f)
     image_index=0
+    predict_index=[]#记录预测为1的image_index,方便修改进行处理。
     for k, (images, _) in enumerate(train_loader):    
         predict_info=cls_model(images[0])
-
         predict_labels=paddle.argmax(predict_info,axis=-1)
         seg_img_numpy=images[2].numpy()# 这个图片是原始的图片
         img_len=seg_img_numpy.shape[0]
@@ -107,10 +144,15 @@ def fast_infer():
             seg_img[:,w//2]=0
             #plt.imshow(seg_img )
             pil_image=Image.fromarray(seg_img)
-            pil_image.save("tmp/project_ocrSentences_dataset/word_image_slice/word_seg_{:04d}_type_{:02d}.png".format(image_index,int(predict_labels[i])))
+            predict_label=int(predict_labels[i])
+            pil_image.save("tmp/project_ocrSentences_dataset/word_image_slice/word_seg_{:04d}_type_{:02d}.png".format(image_index,predict_label))
+            if predict_label==1:
+                predict_index.append(image_index)
             image_index+=1
             i+=1
-    render_html()
+    # 还要生成predict_labels
+    render_html("tmp/project_ocrSentences_dataset/word_image_slice/")
+
 
 def image_byte_infer():
     from paddle.vision import transforms
@@ -177,6 +219,13 @@ def infer_single_image(image_byte):
     输出：基于图片的输出分割线。
     """
     image_byte_infer() 
+
+def copy_image():
+    # 胶水代码，之后可以删除。
+    # 从ocr_data 里面搬一些数据到指定目录
+    src_dir="tmp/ocr_data"
+    for num_dir in os.listdir(src_dir):
+        pass
 
 if __name__ == '__main__':
     with paddle.no_grad():

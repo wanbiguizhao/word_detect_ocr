@@ -9,4 +9,4 @@ env = Environment(
     loader=FileSystemLoader(PROJECT_DIR),
     autoescape=select_autoescape()
 )
-env_template = env.get_template(TEMPLATE_PATH)
+env_template = env.get_template("templates/image_template.html")
