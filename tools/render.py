@@ -1,10 +1,11 @@
 # 把图片的所有图片都组合起来，方便人工校验，是否可以切割图片。
 import os
+import re
 PROJECT_DIR= os.path.dirname(
     os.path.realpath( __file__)
 )
 from  config import env_template as template
-TEMPLATE_PATH=os.path.join(PROJECT_DIR,"templates/image_template.html")
+
 def render_html(word_image_slice_dir):
     #word_image_slice_dir 存放图像切片的目录。
     image_info_table=[]
