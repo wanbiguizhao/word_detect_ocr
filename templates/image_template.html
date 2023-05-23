@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>My Webpage</title>
+</head>
+<style>
+    table {
+      font-family: arial, sans-serif;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+    #c00 {
+        background-color: rgb(57, 133, 71);
+    }
+    #c01 {
+        background-color: yellow;
+    }
+    #c02 {
+        background-color: rgb(145, 243, 118);
+    }
+    #c03 {
+        background-color: rgb(71, 237, 124);
+    }
+    #c04 {
+        background-color: rgb(240, 66, 8);
+    }
+    #c05 {
+        background-color: rgb(108, 126, 243);
+    }
+    #c06 {
+        background-color: rgb(125, 16, 234);
+    }
+    #c07 {
+        background-color: rgb(240, 5, 181);
+    }
+    #c08 {
+        background-color: rgb(140, 63, 80);
+    }
+    #c09 {
+        background-color: rgba(140, 151, 72, 0.432);
+    }
+    #c10 {
+        background-color: rgba(202, 13, 244, 0.846);
+    }
+    td, th {
+      border: 2px solid #89c263;
+      text-align: center;
+      padding: 1px;
+      position: relative;
+      width: auto;
+    }
+    img {
+        width:48;
+        height: 144;
+    }
+    
+    tr:nth-child(1n) {
+      background-color: #f0d8d8;
+    }
+    tr:nth-child(2n) {
+      background-color: #e6edb6;
+    }
+    tr:nth-child(2n) {
+      background-color: #f2ecec;
+    }
+    </style>
+<body>
+    <ul id="navigation">
+    <table>
+        {% for image_info_list in image_info_table %}
+        <tr> 
+            {% for image_info in image_info_list %}
+                <td id="c{{image_info['id_cluster']}}"> {{image_info['id_cluster']}}  </td>
+            {% endfor %}
+        </tr>
+            <tr> 
+                {% for image_info in image_info_list %}
+                    <td> {{image_info['id_ds']}}</td>
+                {% endfor %}
+            </tr>
+            <tr> 
+                {% for image_info in image_info_list %}
+                    <td> <img src="{{image_info['path']}}" width="32" height="96" ></td>
+                {% endfor %}
+            </tr>
+
+        {% endfor %}
+      </table>
+        {% for number in range(15) %}
+    <p ><span>...</span></p>
+        {% endfor %}
+</body>
+</html>
