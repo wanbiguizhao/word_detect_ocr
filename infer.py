@@ -128,7 +128,7 @@ def fast_infer():
     for f in glob.glob("tmp/project_ocrSentences_dataset/word_image_slice/word_s*.png"):
         os.remove(f)
     image_index=0
-    predict_index=[]#记录预测为1的image_index,方便修改进行处理。
+    predict_index_list=[]#记录预测为1的image_index,方便修改进行处理。
     for k, (images, _) in enumerate(train_loader):    
         predict_info=cls_model(images[0])
         predict_labels=paddle.argmax(predict_info,axis=-1)
@@ -147,10 +147,12 @@ def fast_infer():
             predict_label=int(predict_labels[i])
             pil_image.save("tmp/project_ocrSentences_dataset/word_image_slice/word_seg_{:04d}_type_{:02d}.png".format(image_index,predict_label))
             if predict_label==1:
-                predict_index.append(image_index)
+                predict_index_list.append(image_index)
             image_index+=1
             i+=1
-    # 还要生成predict_labels
+    with open("tmp/project_ocrSentences_dataset/word_image_slice/predict_labels.txt","w") as predict_labels_file:
+        for x in predict_index_list:
+            predict_labels_file.write(f"{str(x)}\n")
     render_html("tmp/project_ocrSentences_dataset/word_image_slice/")
 
 

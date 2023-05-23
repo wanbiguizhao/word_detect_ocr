@@ -134,7 +134,11 @@ class WIPDataset(Dataset):
             image=cv.imread(image_path,cv.IMREAD_GRAYSCALE)
             
             h,w=image.shape
-            resize_image=cv.resize(image,(w,64)) #.resize(64,w)# 强制变化为高度是64的情况。
+            if h<80:
+                resize_hh=64
+            else:
+                resize_hh=128
+            resize_image=cv.resize(image,(w,resize_hh)) #.resize(64,w)# 强制变化为高度是64的情况。
             # 切掉白色的两边
             blur = cv.GaussianBlur(resize_image,(5,5),0)
 
