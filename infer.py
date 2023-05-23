@@ -1,5 +1,6 @@
 
 import argparse
+import shutil
 import paddle 
 from models.resnetmodels import HackResNet
 from data.dataset import WIPByteDataset
@@ -73,47 +74,23 @@ def test_infer(args):
             avgacc=sumacc/(bid+1)
             print(avgacc)
 
-def one_image_infer(image_dir,image_name):
+
+
+def batch_image_infer():
     # 使用模型对对图片进行预测
     # 在图片上画出单个汉字。
     cls_model=load_model()
     cls_model.eval()
-    model_ds=WIPDataset(data_dir=image_dir,transform=image_transform())
-    train_loader = DataLoader(
-                model_ds,
-                batch_size=256,
-                shuffle=False,
-                num_workers=1,
-                #pin_memory=True, paddle 没有过
-                #sampler=None,
-                drop_last=False,
-            )
-    for f in glob.glob(f"{image_dir}/word_s*.png"):
-        # 删除之前的图片切片
-        os.remove(f)
-    image_index=0
-    for k, (images, _) in enumerate(train_loader):    
-        predict_info=cls_model(images[0])
-        predict_labels=paddle.argmax(predict_info,axis=-1)
-        seg_img_numpy=images[2].numpy()# 这个图片是原始的图片
-        img_len=seg_img_numpy.shape[0]
-        i=0
-        while i< img_len:
-            seg_img=seg_img_numpy[i,:,:]
-            h,w=seg_img.shape
-            seg_img[:,w//2]=0
-            #plt.imshow(seg_img )
-            pil_image=Image.fromarray(seg_img)
-            pil_image.save("{}/words/word_seg_{:04d}_type_{:02d}.png".format(image_dir,image_index,int(predict_labels[i])))
-            image_index+=1
-            i+=1
-    render_html(image_dir)# 生成预测后的数据
- 
-def fast_infer():    
-    cls_model=load_model()
-    cls_model.eval()
+    BASIC_IMAGE_DIR="tmp/infer"
+    for image_dir in os.listdir(BASIC_IMAGE_DIR):
+        fast_infer(cls_model,f"{BASIC_IMAGE_DIR}/{image_dir}")
 
-    model_ds=WIPDataset(data_dir="tmp/project_ocrSentences_dataset/s",transform=image_transform())#这个是模型使用，要对数据做一些变化。
+
+
+
+def fast_infer(cls_model,image_data_dir):
+    #注意要解析的图片文件名以s开头
+    model_ds=WIPDataset(data_dir=image_data_dir+"/s",transform=image_transform())#这个是模型使用，要对数据做一些变化。
     train_loader = DataLoader(
             model_ds,
             batch_size=256,
@@ -123,9 +100,8 @@ def fast_infer():
             #sampler=None,
             drop_last=False,
         )
-    
     import glob, os
-    for f in glob.glob("tmp/project_ocrSentences_dataset/word_image_slice/word_s*.png"):
+    for f in glob.glob(f"{image_data_dir}/word_s*.png"):
         os.remove(f)
     image_index=0
     predict_index_list=[]#记录预测为1的image_index,方便修改进行处理。
@@ -145,15 +121,24 @@ def fast_infer():
             #plt.imshow(seg_img )
             pil_image=Image.fromarray(seg_img)
             predict_label=int(predict_labels[i])
-            pil_image.save("tmp/project_ocrSentences_dataset/word_image_slice/word_seg_{:04d}_type_{:02d}.png".format(image_index,predict_label))
+            pil_image.save("{}/word_seg_{:04d}_type_{:02d}.png".format(image_data_dir,image_index,predict_label))
             if predict_label==1:
                 predict_index_list.append(image_index)
             image_index+=1
             i+=1
-    with open("tmp/project_ocrSentences_dataset/word_image_slice/predict_labels.txt","w") as predict_labels_file:
+    with open(f"{image_data_dir}/predict_labels.txt","w") as predict_labels_file:
         for x in predict_index_list:
             predict_labels_file.write(f"{str(x)}\n")
-    render_html("tmp/project_ocrSentences_dataset/word_image_slice/")
+    render_html(f"{image_data_dir}")
+
+def test_fast_infer():
+    # 把要预测的图片放到 tmp/project_ocrSentences_dataset/中 
+    #自动给出预测的预测结果，切图
+    cls_model=load_model()
+    cls_model.eval()
+    fast_infer(cls_model,image_data_dir="tmp/project_ocrSentences_dataset/word_image_slice")
+
+
 
 
 def image_byte_infer():
@@ -224,13 +209,21 @@ def infer_single_image(image_byte):
 
 def copy_image():
     # 胶水代码，之后可以删除。
-    # 从ocr_data 里面搬一些数据到指定目录
+    # 从ocr_data 把png图片存放到指定目录，进行预测工作。
     src_dir="tmp/ocr_data"
+    dst_dir="tmp/infer"
     for num_dir in os.listdir(src_dir):
-        pass
+        for image_name in os.listdir(f"{src_dir}/{num_dir}/sentence/"):
+            pure_name,ext=os.path.splitext(image_name)
+            tar_get_dir=f"{dst_dir}/{num_dir}_{pure_name}"
+            os.makedirs(tar_get_dir,exist_ok=True)
+            shutil.copy2(f"{src_dir}/{num_dir}/sentence/{image_name}",f"{tar_get_dir}/{image_name}")
 
 if __name__ == '__main__':
+    # copy_image()
+    # exit()
     with paddle.no_grad():
         #load_dataset_from_image()
-        fast_infer()
+        #test_fast_infer()
+        batch_image_infer()
         #image_byte_infer()

@@ -11,7 +11,6 @@ def render_html(word_image_slice_dir):
     image_info_table=[]
     row_info=[]
     col_count=0
-    print(os.getcwd())
     for image_info in sorted(os.listdir(word_image_slice_dir)):
         if "png" not in image_info:
             continue
