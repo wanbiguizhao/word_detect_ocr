@@ -6,13 +6,9 @@ from sklearn.model_selection import train_test_split
 import os
 import re 
 PROJECT_DIR= os.path.dirname(
-                os.path.dirname(
-                    os.path.dirname(
                         os.path.dirname(os.path.realpath( __file__))
-                                    )
-                                )
                             )
-DATASET_DIR=os.path.join(PROJECT_DIR,"moco","dataset")
+DATASET_DIR=os.path.join(PROJECT_DIR,"tmp/dataset02")
 
 import glob
 import paddle.vision.transforms as transforms
@@ -175,6 +171,50 @@ def pipline_data_mlp(dataset_dir,expansion=2,test_size=0.2):
     #print(type(new_labels_image_info), sum(new_labels_image_info["Image_Type"]), [ [key,len(val)] for key,val in new_labels_image_info.items()])
     #train_data ,test_data =train_test_split(labels_image_info,test_size=0.2)
     return train_labels,test_labels
+
+def pipline_data_gru(dataset_dir,size=80,test_size=0.2):
+    """
+    专门为gru的图片使用数据集
+    train_test_split必须重新调整，
+    
+    """
+    def merge_data(x,y):
+        # 数据结构变化，原来的数据结构是：[{},{},{}]现在变化为{key:[],key:[],}
+        if x is None:
+            x=defaultdict(list)
+        for key,val in y.items():
+                x[key].append(val)
+        return x 
+    labels_image_info=load_image_labels_info(dataset_dir)#一个长度为80个标签，然后长度为40往前分标签，然后再做区分。
+    gru_labels_image_label=[]
+    # 这里安装硬代码进行安装
+    beg_index=0
+    end_index=80
+    step=40
+    while end_index<len(labels_image_info):
+        gru_labels_image_label.append(
+            labels_image_info[beg_index:end_index]
+        )
+        beg_index+=step
+        end_index+=step
+    train_data,test_data=train_test_split(gru_labels_image_label,test_size=test_size)# 数据先分配了一下
+    train_labels=defaultdict(list)
+    for td in train_data:
+        # td 的数结构是[{key:v,key,:v}]做一次数据转换
+        for k , v in reduce(merge_data,[None]+td).items():
+            train_labels[k].append(v)
+        
+    test_labels=defaultdict(list)
+    for td in test_data:
+        # td 的数结构是[{key:v,key,:v}]做一次数据转换
+        for k , v in reduce(merge_data,[None]+td).items():
+            test_labels[k].append(v)
+
+
+    # 加载图片
+    #print(type(new_labels_image_info), sum(new_labels_image_info["Image_Type"]), [ [key,len(val)] for key,val in new_labels_image_info.items()])
+    #train_data ,test_data =train_test_split(labels_image_info,test_size=0.2)
+    return train_labels,test_labels
 def pipline_infer_data_mlp(dataset_dir):
     pass
 
@@ -190,5 +230,6 @@ class DataCooker:
         pass
 
 if __name__ == "__main__":
-    pipline_data_mlp(DATASET_DIR,expansion=3)
+    #pipline_data_mlp(DATASET_DIR,expansion=3)
+    pipline_data_gru(DATASET_DIR)
 # %%

@@ -53,3 +53,49 @@ class WordImageSliceMLPCLS(nn.Layer):
         for encoder_model in [self.encoder_model_K,self.encoder_model_Q]:
             for param in encoder_model.parameters():
                 param.stop_gradient = True
+
+
+class WordImageSliceGRUCLS(nn.Layer):
+    """
+    基于GTU的0-1分类器
+    """
+    def __init__(self,encoder_model_k:nn.Layer,encoder_model_q:nn.Layer,dim=128,num_classes=2,freeze_flag=False) -> None:
+        super().__init__()
+        self.encoder_model_K:nn.Layer=encoder_model_k #基于对比学习的backbone 
+        self.encoder_model_Q:nn.Layer=encoder_model_q #基于对比学习的backbone 
+        #self.encoder_model=self.encoder_model_Q
+        # 冻结backbone的参数
+
+        self.linear = nn.Sequential(
+                nn.Linear(dim*2, 64),
+                nn.ReLU(),
+                nn.Linear(64, 16), 
+                nn.ReLU(),
+                #nn.Linear(6, 8),
+                nn.Linear(16, num_classes),
+            )
+        self.gru=nn.GRU(dim, dim, num_layers=2, direction='bidirectional',dropout=0.5)
+        self.dropout=nn.Dropout(p=0.5)
+        if freeze_flag:
+            self.freeze_backone()
+
+    def forward(self, *inputs, **kwargs):
+        # inputs: btach_size,len,chanel,h,w
+        inputs=inputs[0]
+        batch_size,seq_len,channel,w,h=inputs.shape
+        kx=self.encoder_model_K(inputs.reshape([-1,channel,w,h])) # batch_size,dim
+        #qx=self.encoder_model_Q(inputs.reshape([-1,channel,w,h]))
+        #emb=paddle.concat([kx,qx],axis=-1)
+        
+        kx=kx.reshape([batch_size,seq_len,-1])
+
+        output, _ = self.gru(kx)
+        #hidden = paddle.concat((hidden[-2,:,:], hidden[-1,:,:]), axis = 1)
+        #x=self.linear(g0*kx+g1*qx)
+        hidden = self.dropout(output)
+        return self.linear(hidden) 
+    def freeze_backone(self):
+        # 冻结编码器参数。
+        for encoder_model in [self.encoder_model_K,self.encoder_model_Q]:
+            for param in encoder_model.parameters():
+                param.stop_gradient = True
