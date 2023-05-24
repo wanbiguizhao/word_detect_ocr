@@ -55,10 +55,10 @@ def load_model():
     encoder_q_model=HackResNet(num_classes=128)
     # encoder_k_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_k_model.pdparams"))
     # encoder_q_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_q_model.pdparams"))
-    encoder_k_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_045_encoder_k_model.pdparams"))
-    encoder_q_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_045_encoder_k_model.pdparams"))
+    encoder_k_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
+    encoder_q_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
     cls_model=WordImageSliceMLPCLS(encoder_model_k=encoder_k_model,encoder_model_q=encoder_q_model,freeze_flag=True)
-    cls_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_045_model.pdparams"))
+    cls_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_model.pdparams"))
     return cls_model
 
 def test_infer(args):
@@ -80,10 +80,12 @@ def batch_image_infer():
     # 使用模型对对图片进行预测
     # 在图片上画出单个汉字。
     cls_model=load_model()
+    #cls_model.eval()
     #cls_model
     BASIC_IMAGE_DIR="tmp/infer"
     for image_dir in os.listdir(BASIC_IMAGE_DIR):
-        fast_infer(cls_model,f"{BASIC_IMAGE_DIR}/{image_dir}")
+        with paddle.no_grad():
+            fast_infer(cls_model,f"{BASIC_IMAGE_DIR}/{image_dir}")
 
 
 

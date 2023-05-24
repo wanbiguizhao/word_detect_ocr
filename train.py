@@ -27,6 +27,7 @@ def train(train_loader:DataLoader, model:nn.Layer,loss_function, optimizer, epoc
     sumloss=0
     sumacc=0
     recall=Recall()
+    model.train()
     for bid, (batch_image,batch_image_type,batch_image_import_flag) in enumerate(train_loader):
         output=model(batch_image[0])
         loss=loss_function(output,batch_image_type.unsqueeze(1))
@@ -87,7 +88,7 @@ def get_dataloader(dataset_dir,expansion,args):
     train_dataset,test_dataset=MLPDataset(train_data,pin_transform),MLPDataset(test_data,pin_transform)
     train_loader=DataLoader(train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=args.workers,
         batch_sampler=None,
         drop_last=False,
@@ -148,13 +149,15 @@ def main():
             weight_decay=args.weight_decay,
      )# pytorch 对应的优化器是SGD
     # 模型训练和评估
-    loss_function = nn.CrossEntropyLoss(weight=paddle.to_tensor([0.35,0.65]))
+    loss_function = nn.CrossEntropyLoss(weight=paddle.to_tensor([0.25,0.75]))
     for epoch in range(args.start_epoch, args.epochs):
         train_info=train(train_loader, cls_model,loss_function, optimizer, epoch, args)
-        print(train_info)
+        #print(train_info)
         lr.step(epoch)# 更新一下学习率
         with paddle.no_grad():
+            cls_model.eval()
             print("eval",eval(test_loader,cls_model,loss_function,epoch,args))
+            cls_model.train()
         if epoch>0 and epoch%args.checkpoint_steps==0:
             checkpoint(cls_model,optimizer,train_info,args.checkpoint)
 #    if global_steps % args.checkpoint_steps == 0:

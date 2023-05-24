@@ -4,7 +4,7 @@ def trainparser():
     parser.add_argument("--data",type=str,default="tmp/dataset02", metavar="DIR", help="path to dataset,指向按行切割的图片的文件夹目录")
     parser.add_argument(
         "--expansion",
-        default=5,
+        default=3,
         type=int,
         metavar="EXPAN",
         help="对于连着的图片的数据，复制倍数",
@@ -20,7 +20,7 @@ def trainparser():
     parser.add_argument("--moco_model",type=str,default="tmp/checkpoint/epoch_011_bitchth_003500_model.pdparams", metavar="Backnone", help="对比模型的存储目录")
     parser.add_argument("--freeze_flag", action="store_true", help="训练模型是否冻结backbone")# paddle的学习率使用策略和pytorch不一样
     parser.add_argument("--checkpoint", type=str,default="tmp/nobackbone", help="训练模型的保存位置")# paddle的学习率使用策略和pytorch不一样
-    parser.add_argument("--checkpoint_steps", type=int,default=15, help="每过多少轮保存一下模型")# paddle的学习率使用策略和pytorch不一样
+    parser.add_argument("--checkpoint_steps", type=int,default=2, help="每过多少轮保存一下模型")# paddle的学习率使用策略和pytorch不一样
 
     parser.add_argument("--logdir", type=str,default="tmp/moco_cls", help="训练日志存储路径")# paddle的学习率使用策略和pytorch不一样
 
@@ -33,7 +33,7 @@ def trainparser():
         help="加载dataset的work",
     )
     parser.add_argument(
-        "--epochs", default=60, type=int, metavar="N", help="总共训练的轮数" 
+        "--epochs", default=21, type=int, metavar="N", help="总共训练的轮数" 
     )
     parser.add_argument(
         "--start-epoch",
@@ -45,7 +45,7 @@ def trainparser():
     parser.add_argument(
         "-b",
         "--batch-size",
-        default=128,
+        default=256,
         type=int,
         metavar="N",
         help=" 这个意思莫非是，多卡GPU的情况，256被多卡平均使用，想多了，用不到多卡",
