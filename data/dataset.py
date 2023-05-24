@@ -124,9 +124,10 @@ class WIPDataset(Dataset):
         self.image_info={
             "image_path":[],
             "image":[],
+            "origin_image":[],
             "crop_info":[]
         }
-        
+        self.half_width_padding=8# 为了保证图片可以被窗口扫描到，在图片左右两侧进行填充，超参数。
         #for image_path in tqdm(glob(os.path.join(data_dir,"*","*.png"),recursive=True)[:20]):
         # 需要重新设计一下数据结构。
         for image_path in sorted(tqdm(glob(os.path.join(data_dir+"*.png"),recursive=False))):
@@ -134,11 +135,11 @@ class WIPDataset(Dataset):
             image=cv.imread(image_path,cv.IMREAD_GRAYSCALE)
             
             h,w=image.shape
-            if h<80:
+            if h!=80:
                 resize_hh=64
+                resize_image=cv.resize(image,(w,resize_hh)) #.resize(64,w)# 强制变化为高度是64的情况。
             else:
-                resize_hh=128
-            resize_image=cv.resize(image,(w,resize_hh)) #.resize(64,w)# 强制变化为高度是64的情况。
+                resize_image=image
             # 切掉白色的两边
             blur = cv.GaussianBlur(resize_image,(5,5),0)
 
@@ -152,8 +153,9 @@ class WIPDataset(Dataset):
             #top, bottom = h_padding//2, h_padding-(h_padding//2)# 上下部分填充
             #left,right=w_padding//2,w_padding-(w_padding//2)
             
-            new_image = cv.copyMakeBorder(th_image, 0, 0, 8, 8,cv.BORDER_CONSTANT, value=(255,))
+            new_image = cv.copyMakeBorder(th_image, 0, 0, self.half_width_padding, self.half_width_padding,cv.BORDER_CONSTANT, value=(255,))# 给图片前后都加了8白色，方便可以窗口扫描到。
             self.image_info["image_path"].append(image_path)
+            self.image_info["origin_image"].append(image)
             self.image_info["image"].append(new_image)
             #self.image_info["crop_info"].append([beg_index,end_index])
             # 记录一下图片，然后记录一下，图片切割后的图片例子，

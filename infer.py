@@ -110,8 +110,8 @@ def fast_infer(cls_model,image_data_dir):
     for k, (images, _) in enumerate(train_loader):    
         predict_info=cls_model(images[0])
         predict_labels=paddle.argmax(predict_info,axis=-1)
-        seg_img_numpy=images[2].numpy()# 这个图片是原始的图片
-        img_len=seg_img_numpy.shape[0]
+        seg_img_numpy=images[2].numpy()
+        img_len=seg_img_numpy.shape[0]# 对应batchsize
         i=0
         while i< img_len:
             # 
