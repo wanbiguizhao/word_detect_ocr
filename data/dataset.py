@@ -144,23 +144,12 @@ class WIPDataset(Dataset):
             blur = cv.GaussianBlur(resize_image,(5,5),0)
 
             ret3,th_image = cv.threshold(blur,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
-            # 这块要做一次变化，等比例变成64的高度。
-            
-            #beg_index,end_index=imageStrip(th_image)
-            #w=end_index-beg_index+1
-            #h_padding=48-h
-            #w_padding=(4-w%4)%4
-            #top, bottom = h_padding//2, h_padding-(h_padding//2)# 上下部分填充
-            #left,right=w_padding//2,w_padding-(w_padding//2)
+            # 这块要做一次变化，等比例变成64的高度
             
             new_image = cv.copyMakeBorder(th_image, 0, 0, self.half_width_padding, self.half_width_padding,cv.BORDER_CONSTANT, value=(255,))# 给图片前后都加了8白色，方便可以窗口扫描到。
             self.image_info["image_path"].append(image_path)
             self.image_info["origin_image"].append(image)
             self.image_info["image"].append(new_image)
-            #self.image_info["crop_info"].append([beg_index,end_index])
-            # 记录一下图片，然后记录一下，图片切割后的图片例子，
-            # new_image_list=[] # 存储一下切割后的
-            # image_mapping={}, key 表示的切割的第i个元素， value： { image_index:{这个元素在图片中的索引位置},beg_index:int,end_index:int} 的数据
             for beg,end in splitImage(new_image):
                 self.data_list.append(
                     {
@@ -193,17 +182,26 @@ class WIPDataset(Dataset):
         # # 应用数据处理方法到图像上
         if self.transform is not None:
             image_0,image_1 = self.transform(float_seg_image)
-            return [image_0,image_1,seg_image], 0
+            return [image_0,image_1,seg_image],0
         # # CrossEntropyLoss要求label格式为int，将Label格式转换为 int
         # #label = int(label)
         # 返回图像和对应标签
-        return [seg_image,seg_image,seg_image], 0
+        return [seg_image,seg_image,seg_image], 0# 确认不用+1，闭区间。
 
     def __len__(self):
         """
         步骤四：实现 __len__ 函数，返回数据集的样本总数
         """
         return len(self.data_list)
+    def get_origin_image_by_index(self,index):
+        # 索引index和__getitem__一样，获得原始数据集的信息
+        seg_image_info = self.data_list[index]
+        image_index=seg_image_info["image_index"]
+        image=self.image_info["origin_image"][image_index]
+        origin_beg_index=seg_image_info["seg_beg_index"]-self.half_width_padding # 要减去偏移量，对于可能存在后续中要检查index为-的情况。
+        origin_end_index=seg_image_info["seg_end_index"]-self.half_width_padding
+        return [image,origin_beg_index,origin_end_index]
+
 
 class WIPObjDataset(Dataset):
     """

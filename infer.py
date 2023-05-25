@@ -13,6 +13,7 @@ from tools.render import render_html
 from paddle.io import DataLoader 
 from PIL import Image
 import glob, os
+import cv2 as cv
 parser = argparse.ArgumentParser(description="推测一个神经网络")
 parser.add_argument("--data",type=str,default="mocov1/dataset", metavar="DIR", help="path to dataset,指向按行切割的图片的文件夹目录")
 parser.add_argument(
@@ -124,13 +125,31 @@ def fast_infer(cls_model,image_data_dir):
             pil_image=Image.fromarray(seg_img)
             predict_label=int(predict_labels[i])
             pil_image.save("{}/word_seg_{:04d}_type_{:02d}.png".format(image_data_dir,image_index,predict_label))
+
+            # 希望可以在原来的图像上划去分割线。拿到原来的图片和对应图片的位置。
+            origin_image,beg_pixel_index,end_pixel_index=model_ds.get_origin_image_by_index(image_index)
+            mid_pixel_index=(beg_pixel_index+end_pixel_index)//2
+            if mid_pixel_index<0:
+                mid_pixel_index=0
+            elif mid_pixel_index>=origin_image.shape[1]:
+                mid_pixel_index=origin_image.shape[1]-1
+            
+
             if predict_label==1:
+                origin_image[:,mid_pixel_index]=0# 在原来的图片上画上一条分隔符
                 predict_index_list.append(image_index)
             image_index+=1
             i+=1
+
     with open(f"{image_data_dir}/predict_labels.txt","w") as predict_labels_file:
         for x in predict_index_list:
             predict_labels_file.write(f"{str(x)}\n")
+    # 存储画过线后的原始图片
+    for index in range(len(model_ds.image_info["origin_image"])):
+        image_path=model_ds.image_info["image_path"][index]
+        origin_image=model_ds.image_info["origin_image"][index]
+        cv.imwrite(image_path.replace(".png","_infer.png"),origin_image)
+        #origin_image
     print(image_data_dir,len(predict_index_list))
     render_html(f"{image_data_dir}")
 
@@ -215,6 +234,10 @@ def copy_image():
     # 从ocr_data 把png图片存放到指定目录，进行预测工作。
     src_dir="tmp/ocr_data"
     dst_dir="tmp/infer"
+    for dir_file in os.listdir(dst_dir):
+        if os.path.exists(os.path.join(dst_dir,dir_file)):
+            print("目标目录存在文件夹，请确认后再执行此操作",os.path.join(dst_dir,dir_file))
+            return 
     for num_dir in os.listdir(src_dir):
         for image_name in os.listdir(f"{src_dir}/{num_dir}/sentence/"):
             pure_name,ext=os.path.splitext(image_name)
@@ -223,10 +246,11 @@ def copy_image():
             shutil.copy2(f"{src_dir}/{num_dir}/sentence/{image_name}",f"{tar_get_dir}/{image_name}")
 
 if __name__ == '__main__':
-    # copy_image()
+    #copy_image()
     # exit()
     with paddle.no_grad():
         #load_dataset_from_image()
         #test_fast_infer()
+         
         batch_image_infer()
         #image_byte_infer()

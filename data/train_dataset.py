@@ -15,7 +15,8 @@ class MLPDataset(Dataset):
     def __init__(self,labels_image_info,transform=None):
         super().__init__()
         #self.image_list=list(map(lambda x:cv.resize(cv.imread(x,cv.IMREAD_GRAYSCALE),[64,16]),labels_image_info["Image_Path"] ))
-        self.image_list=list(map(lambda x:resize(x),labels_image_info["Image_Path"] ))
+        self.image_list=list(map(lambda x:resize(x),labels_image_info["Image_Path"]))
+        
         self.image_type_list=labels_image_info["Image_Type"]
         self.image_import_flag_list=labels_image_info["Import_Flag"]
         self.transform=transform
