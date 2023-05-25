@@ -28,9 +28,9 @@ class WordImageSliceMLPCLS(nn.Layer):
             nn.Linear(dim,2)
             )
         self.linear = nn.Sequential(
-                nn.Linear(dim, 64),
+                nn.Linear(dim, 32),
                 nn.ReLU(),
-                nn.Linear(64, 16), 
+                nn.Linear(32, 16), 
                 nn.ReLU(),
                 #nn.Linear(6, 8),
                 nn.Linear(16, num_classes),

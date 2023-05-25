@@ -27,7 +27,7 @@ def trainparser():
     parser.add_argument(
         "-j",
         "--workers",
-        default=2,
+        default=4,
         type=int,
         metavar="N",
         help="加载dataset的work",

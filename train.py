@@ -12,6 +12,7 @@ import paddle.optimizer as optim
 from lr import MYLR
 from paddle.nn import CrossEntropyLoss
 from paddle.metric import accuracy
+from paddle.metric import Precision
 from paddle.metric import Recall
 from visualdl import LogWriter
 
@@ -54,11 +55,13 @@ def eval(test_loader, model:nn.Layer,loss_function, epoch, args):
     sumloss=0
     sumacc=0
     recall=Recall()
+    precision=Precision()
     for bid ,(batch_image,batch_image_type,batch_image_import_flag) in enumerate(test_loader):
         output=model(batch_image[0])
         loss=loss_function(output,batch_image_type)
         acc = accuracy(output, batch_image_type.unsqueeze(1))
         recall.update(output.argmax(-1).unsqueeze(1), batch_image_type.unsqueeze(1))
+        precision.update(output.argmax(-1).unsqueeze(1), batch_image_type.unsqueeze(1))
         sumloss+=float(loss)
         avgloss=sumloss/(bid+1)
         
@@ -69,7 +72,7 @@ def eval(test_loader, model:nn.Layer,loss_function, epoch, args):
         writer.add_scalar(tag="eval/acc", step=epoch, value=avgacc)
         writer.add_scalar(tag="eval/loss", step=epoch, value=avgloss)
         writer.add_scalar(tag="eval/recall", step=epoch, value=recall.accumulate())
-    return {"loss":avgloss,"acc":avgacc,"epoch":epoch,"recall":recall.accumulate()}
+    return {"loss":avgloss,"acc":avgacc,"epoch":epoch,"recall":recall.accumulate(),'prrcision':precision.accumulate()}
 
 
 def get_dataloader(dataset_dir,expansion,args):
@@ -149,7 +152,7 @@ def main():
             weight_decay=args.weight_decay,
      )# pytorch 对应的优化器是SGD
     # 模型训练和评估
-    loss_function = nn.CrossEntropyLoss(weight=paddle.to_tensor([0.25,0.75]))
+    loss_function = nn.CrossEntropyLoss(weight=paddle.to_tensor([0.3,0.7]))
     for epoch in range(args.start_epoch, args.epochs):
         train_info=train(train_loader, cls_model,loss_function, optimizer, epoch, args)
         #print(train_info)

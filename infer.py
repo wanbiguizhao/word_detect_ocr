@@ -92,6 +92,11 @@ def batch_image_infer():
 
 
 def fast_infer(cls_model,image_data_dir):
+    import glob, os
+    for f in glob.glob(f"{image_data_dir}/word_s*.png"):
+        os.remove(f)
+    for f in glob.glob(f"{image_data_dir}/*infer*.png"):
+        os.remove(f)
     #注意要解析的图片文件名以s开头
     model_ds=WIPDataset(data_dir=image_data_dir+"/s",transform=image_transform())#这个是模型使用，要对数据做一些变化。
     train_loader = DataLoader(
@@ -103,9 +108,7 @@ def fast_infer(cls_model,image_data_dir):
             #sampler=None,
             drop_last=False,
         )
-    import glob, os
-    for f in glob.glob(f"{image_data_dir}/word_s*.png"):
-        os.remove(f)
+
     image_index=0
     predict_index_list=[]#记录预测为1的image_index,方便修改进行处理。
     for k, (images, _) in enumerate(train_loader):    
@@ -246,7 +249,7 @@ def copy_image():
             shutil.copy2(f"{src_dir}/{num_dir}/sentence/{image_name}",f"{tar_get_dir}/{image_name}")
 
 if __name__ == '__main__':
-    #copy_image()
+    copy_image()
     # exit()
     with paddle.no_grad():
         #load_dataset_from_image()

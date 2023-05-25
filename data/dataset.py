@@ -135,7 +135,10 @@ class WIPDataset(Dataset):
             image=cv.imread(image_path,cv.IMREAD_GRAYSCALE)
             
             h,w=image.shape
-            if h!=80:
+            if h>80:
+                resize_hh=128
+                resize_image=cv.resize(image,(w,resize_hh)) #.resize(64,w)# 强制变化为高度是64的情况。
+            elif h!=64:
                 resize_hh=64
                 resize_image=cv.resize(image,(w,resize_hh)) #.resize(64,w)# 强制变化为高度是64的情况。
             else:
