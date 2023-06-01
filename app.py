@@ -3,26 +3,21 @@ import json
 import paddle
 import json
 import numpy as np
-try:
-    from mocov1.cls.pdpd.models import WordImageSliceMLPCLS
-    from mocov1.moco.resnetmodels import HackResNet
-    from mocov1.data.dataset import WIPByteDataset
-except:
-    from cls.pdpd.models import WordImageSliceMLPCLS
-    from moco.resnetmodels import HackResNet
-    from data.dataset import WIPByteDataset
+from models.resnetmodels import HackResNet
+from data.dataset import WIPByteDataset
+from infer import load_model
 
-def load_model():
-    # 这块先进行硬编码把
-    encoder_k_model=HackResNet(num_classes=128)
-    encoder_q_model=HackResNet(num_classes=128)
-    # encoder_k_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_k_model.pdparams"))
-    # encoder_q_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_q_model.pdparams"))
-    encoder_k_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
-    encoder_q_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
-    cls_model=WordImageSliceMLPCLS(encoder_model_k=encoder_k_model,encoder_model_q=encoder_q_model,freeze_flag=True)
-    cls_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_model.pdparams"))
-    return cls_model
+# def load_model():
+#     # 这块先进行硬编码把
+#     encoder_k_model=HackResNet(num_classes=128)
+#     encoder_q_model=HackResNet(num_classes=128)
+#     # encoder_k_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_k_model.pdparams"))
+#     # encoder_q_model.set_state_dict(paddle.load("tmp/checkpoint/epoch_105_encoder_q_model.pdparams"))
+#     encoder_k_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
+#     encoder_q_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_encoder_k_model.pdparams"))
+#     cls_model=WordImageSliceMLPCLS(encoder_model_k=encoder_k_model,encoder_model_q=encoder_q_model,freeze_flag=True)
+#     cls_model.set_state_dict(paddle.load("tmp/nobackbone/epoch_020_model.pdparams"))
+#     return cls_model
 cls_model=load_model()
 cls_model.eval()
 app = Flask(__name__)
@@ -39,9 +34,7 @@ def build_dataloader(image_byte,batch_size=256):
     from paddle.vision import transforms
     from paddle.io import DataLoader 
     #from mocov1 import WIPByteDataset
-    from mocov1.moco.loader import TwoCropsTransform
-    from PIL import Image
-    from mocov1.render import render_html
+    from tools.loader import TwoCropsTransform
     normalize = transforms.Normalize(
             mean=[0.485], std=[0.229]
         )
@@ -109,12 +102,6 @@ def det_image(image_bytes,batch_size=256):
         pre_pixel_index=pixel_index
     if han_appear_flag:
         word_list.append([han_beg_index,pixel_index])
-    # from PIL import Image 
-    
-    # pil_image=Image.fromarray(wip.origin_image)
-    # pil_image.show()
-
-
     return word_list
 @app.route("/",methods = ['GET', 'POST'])
 def hello_world():
@@ -123,7 +110,6 @@ def hello_world():
     if request.method =="POST":
         image_bytes = request.files['file'].read()
         result=det_image(image_bytes,batch_size=batch_size)
-                
         return jsonify(json.loads(json.dumps(result,cls=NpEncoder)))
     html="""
     <html>

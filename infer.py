@@ -169,10 +169,8 @@ def test_fast_infer():
 def image_byte_infer():
     from paddle.vision import transforms
     from paddle.io import DataLoader 
-    from  mocov1.pp_infer import WIPDataset
-    from mocov1.moco.loader import TwoCropsTransform
+    from tools.loader import TwoCropsTransform
     from PIL import Image
-    from mocov1.render import render_html
     normalize = transforms.Normalize(
             mean=[0.485], std=[0.229]
         )
