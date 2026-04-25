@@ -1,0 +1,201 @@
+{
+  "line_id": 23,
+  "parent_image": "page_18.png",
+  "line_y_start": 2241,
+  "line_y_end": 2282,
+  "total_chars": 8,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      145
+    ],
+    [
+      1,
+      146,
+      185
+    ],
+    [
+      0,
+      186,
+      190
+    ],
+    [
+      1,
+      191,
+      229
+    ],
+    [
+      0,
+      230,
+      231
+    ],
+    [
+      1,
+      232,
+      271
+    ],
+    [
+      0,
+      272,
+      277
+    ],
+    [
+      1,
+      278,
+      315
+    ],
+    [
+      0,
+      316,
+      320
+    ],
+    [
+      1,
+      321,
+      359
+    ],
+    [
+      0,
+      360,
+      365
+    ],
+    [
+      1,
+      366,
+      401
+    ],
+    [
+      0,
+      402,
+      406
+    ],
+    [
+      1,
+      407,
+      445
+    ],
+    [
+      0,
+      446,
+      451
+    ],
+    [
+      1,
+      452,
+      463
+    ],
+    [
+      0,
+      464,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png",
+  "chars": [
+    {
+      "char_id": 0,
+      "type": "CHAR",
+      "col_start": 146,
+      "col_end": 185,
+      "abs_x_start": 146,
+      "abs_x_end": 185,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 40,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 1,
+      "type": "CHAR",
+      "col_start": 191,
+      "col_end": 229,
+      "abs_x_start": 191,
+      "abs_x_end": 229,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 39,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 2,
+      "type": "CHAR",
+      "col_start": 232,
+      "col_end": 271,
+      "abs_x_start": 232,
+      "abs_x_end": 271,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 40,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 3,
+      "type": "CHAR",
+      "col_start": 278,
+      "col_end": 315,
+      "abs_x_start": 278,
+      "abs_x_end": 315,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 38,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 4,
+      "type": "CHAR",
+      "col_start": 321,
+      "col_end": 359,
+      "abs_x_start": 321,
+      "abs_x_end": 359,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 39,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 5,
+      "type": "CHAR",
+      "col_start": 366,
+      "col_end": 401,
+      "abs_x_start": 366,
+      "abs_x_end": 401,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 36,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 6,
+      "type": "CHAR",
+      "col_start": 407,
+      "col_end": 445,
+      "abs_x_start": 407,
+      "abs_x_end": 445,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 39,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    },
+    {
+      "char_id": 7,
+      "type": "CHAR",
+      "col_start": 452,
+      "col_end": 463,
+      "abs_x_start": 452,
+      "abs_x_end": 463,
+      "abs_y_start": 2241,
+      "abs_y_end": 2282,
+      "width": 12,
+      "height": 41,
+      "marked_line_path": "output\\lines_marked\\page_18.png_line_23_marked.png"
+    }
+  ]
+}

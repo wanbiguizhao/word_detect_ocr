@@ -1,0 +1,224 @@
+{
+  "line_id": 10,
+  "parent_image": "page_16.png",
+  "line_y_start": 1194,
+  "line_y_end": 1237,
+  "total_chars": 9,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      248
+    ],
+    [
+      1,
+      249,
+      270
+    ],
+    [
+      0,
+      271,
+      286
+    ],
+    [
+      1,
+      287,
+      298
+    ],
+    [
+      0,
+      299,
+      326
+    ],
+    [
+      1,
+      327,
+      366
+    ],
+    [
+      0,
+      367,
+      371
+    ],
+    [
+      1,
+      372,
+      410
+    ],
+    [
+      0,
+      411,
+      412
+    ],
+    [
+      1,
+      413,
+      453
+    ],
+    [
+      0,
+      454,
+      458
+    ],
+    [
+      1,
+      459,
+      496
+    ],
+    [
+      0,
+      497,
+      499
+    ],
+    [
+      1,
+      500,
+      540
+    ],
+    [
+      0,
+      541,
+      545
+    ],
+    [
+      1,
+      546,
+      584
+    ],
+    [
+      0,
+      585,
+      593
+    ],
+    [
+      1,
+      594,
+      602
+    ],
+    [
+      0,
+      603,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png",
+  "chars": [
+    {
+      "char_id": 0,
+      "type": "CHAR",
+      "col_start": 249,
+      "col_end": 270,
+      "abs_x_start": 249,
+      "abs_x_end": 270,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 22,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 1,
+      "type": "CHAR",
+      "col_start": 287,
+      "col_end": 298,
+      "abs_x_start": 287,
+      "abs_x_end": 298,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 12,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 2,
+      "type": "CHAR",
+      "col_start": 327,
+      "col_end": 366,
+      "abs_x_start": 327,
+      "abs_x_end": 366,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 40,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 3,
+      "type": "CHAR",
+      "col_start": 372,
+      "col_end": 410,
+      "abs_x_start": 372,
+      "abs_x_end": 410,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 39,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 4,
+      "type": "CHAR",
+      "col_start": 413,
+      "col_end": 453,
+      "abs_x_start": 413,
+      "abs_x_end": 453,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 41,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 5,
+      "type": "CHAR",
+      "col_start": 459,
+      "col_end": 496,
+      "abs_x_start": 459,
+      "abs_x_end": 496,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 38,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 6,
+      "type": "CHAR",
+      "col_start": 500,
+      "col_end": 540,
+      "abs_x_start": 500,
+      "abs_x_end": 540,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 41,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 7,
+      "type": "CHAR",
+      "col_start": 546,
+      "col_end": 584,
+      "abs_x_start": 546,
+      "abs_x_end": 584,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 39,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    },
+    {
+      "char_id": 8,
+      "type": "CHAR",
+      "col_start": 594,
+      "col_end": 602,
+      "abs_x_start": 594,
+      "abs_x_end": 602,
+      "abs_y_start": 1194,
+      "abs_y_end": 1237,
+      "width": 9,
+      "height": 43,
+      "marked_line_path": "output\\lines_marked\\page_16.png_line_10_marked.png"
+    }
+  ]
+}

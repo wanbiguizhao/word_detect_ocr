@@ -1,0 +1,238 @@
+{
+  "line_info": {
+    "line_id": 7,
+    "parent_image": "page_25.png",
+    "line_y_start": 983,
+    "line_y_end": 1024
+  },
+  "count_info": {
+    "原始字符数": 5,
+    "最终字符数": 5
+  },
+  "fusion_chars": [
+    {
+      "type": "CHAR",
+      "start": 288,
+      "end": 326,
+      "width": 39,
+      "raw": {
+        "char_id": 0,
+        "type": "CHAR",
+        "col_start": 288,
+        "col_end": 326,
+        "abs_x_start": 288,
+        "abs_x_end": 326,
+        "abs_y_start": 983,
+        "abs_y_end": 1024,
+        "width": 39,
+        "height": 41,
+        "marked_line_path": "output\\lines_marked\\page_25.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 327,
+          "end": 332,
+          "width": 6,
+          "raw": [
+            0,
+            327,
+            332
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7231,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 333,
+      "end": 370,
+      "width": 38,
+      "raw": {
+        "char_id": 1,
+        "type": "CHAR",
+        "col_start": 333,
+        "col_end": 370,
+        "abs_x_start": 333,
+        "abs_x_end": 370,
+        "abs_y_start": 983,
+        "abs_y_end": 1024,
+        "width": 38,
+        "height": 41,
+        "marked_line_path": "output\\lines_marked\\page_25.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 371,
+          "end": 375,
+          "width": 5,
+          "raw": [
+            0,
+            371,
+            375
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7284,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 376,
+      "end": 415,
+      "width": 40,
+      "raw": {
+        "char_id": 2,
+        "type": "CHAR",
+        "col_start": 376,
+        "col_end": 415,
+        "abs_x_start": 376,
+        "abs_x_end": 415,
+        "abs_y_start": 983,
+        "abs_y_end": 1024,
+        "width": 40,
+        "height": 41,
+        "marked_line_path": "output\\lines_marked\\page_25.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 416,
+          "end": 421,
+          "width": 6,
+          "raw": [
+            0,
+            416,
+            421
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7248,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 422,
+      "end": 460,
+      "width": 39,
+      "raw": {
+        "char_id": 3,
+        "type": "CHAR",
+        "col_start": 422,
+        "col_end": 460,
+        "abs_x_start": 422,
+        "abs_x_end": 460,
+        "abs_y_start": 983,
+        "abs_y_end": 1024,
+        "width": 39,
+        "height": 41,
+        "marked_line_path": "output\\lines_marked\\page_25.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 461,
+          "end": 465,
+          "width": 5,
+          "raw": [
+            0,
+            461,
+            465
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7232,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 466,
+      "end": 476,
+      "width": 11,
+      "raw": {
+        "char_id": 4,
+        "type": "CHAR",
+        "col_start": 466,
+        "col_end": 476,
+        "abs_x_start": 466,
+        "abs_x_end": 476,
+        "abs_y_start": 983,
+        "abs_y_end": 1024,
+        "width": 11,
+        "height": 41,
+        "marked_line_path": "output\\lines_marked\\page_25.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 477,
+          "end": 1642,
+          "width": 1166,
+          "raw": [
+            0,
+            477,
+            1642
+          ],
+          "is_attached": true
+        },
+        {
+          "type": "BLANK",
+          "start": 1644,
+          "end": 2014,
+          "width": 371,
+          "raw": [
+            0,
+            1644,
+            2014
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7072,
+      "is_garbage": false
+    }
+  ],
+  "chars": [
+    {
+      "col_start": 288,
+      "col_end": 326,
+      "width": 39
+    },
+    {
+      "col_start": 333,
+      "col_end": 370,
+      "width": 38
+    },
+    {
+      "col_start": 376,
+      "col_end": 415,
+      "width": 40
+    },
+    {
+      "col_start": 422,
+      "col_end": 460,
+      "width": 39
+    },
+    {
+      "col_start": 466,
+      "col_end": 476,
+      "width": 11
+    }
+  ]
+}

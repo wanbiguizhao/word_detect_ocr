@@ -1,0 +1,40 @@
+{
+  "line_id": 0,
+  "parent_image": "page_28.png",
+  "line_y_start": 315,
+  "line_y_end": 328,
+  "total_chars": 1,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      1360
+    ],
+    [
+      1,
+      1361,
+      1379
+    ],
+    [
+      0,
+      1380,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_28.png_line_0_marked.png",
+  "chars": [
+    {
+      "char_id": 0,
+      "type": "CHAR",
+      "col_start": 1361,
+      "col_end": 1379,
+      "abs_x_start": 1361,
+      "abs_x_end": 1379,
+      "abs_y_start": 315,
+      "abs_y_end": 328,
+      "width": 19,
+      "height": 13,
+      "marked_line_path": "output\\lines_marked\\page_28.png_line_0_marked.png"
+    }
+  ]
+}
