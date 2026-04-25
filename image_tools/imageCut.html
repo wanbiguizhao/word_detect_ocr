@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>汉字分割线校验工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .toolbar {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+        .canvas-wrapper {
+            border: 2px solid #aaa;
+            background: white;
+            overflow: auto;
+            width: 100%;
+            max-height: 40vh;
+            position: relative;
+            margin-bottom:10px;
+        }
+        #canvasOriginal, #canvasEdit {
+            display: block;
+        }
+        .info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+        .tip {
+            color: #666;
+            font-size: 12px;
+        }
+        #selectionRect {
+            position: absolute;
+            border: 2px solid #0077ff;
+            background: rgba(0,119,255,0.1);
+            pointer-events: none;
+            display: none;
+        }
+        .label {
+            font-weight:bold;
+            margin:5px 0;
+        }
+
+        .drop-area {
+            border: 2px dashed #888;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #fafafa;
+            transition: all 0.2s;
+        }
+        .drop-area.active {
+            border-color: #0077ff;
+            background: #eef7ff;
+        }
+
+        .status-bar {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* 自动消失提示框 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #333;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 9999;
+            opacity: 0.95;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button id="loadImgBtn">加载行图片</button>
+        <button id="loadJsonBtn">加载字符JSON</button>
+        <button id="deleteBtn">删除选中线条</button>
+        <button id="resetBtn">重置编辑数据</button>
+        <button id="saveJsonBtn">导出修正JSON</button>
+    </div>
+
+    <div class="tip">
+        红线=开始 start，绿线=结束 end<br>
+        上图：原始数据｜下图：可编辑数据｜点击/框选选中｜←→方向键移动｜Del键删除
+    </div>
+
+    <div class="drop-area" id="dropArea">
+        拖拽图片 / JSON 文件到这里（可同时拖入 图片+JSON）
+    </div>
+
+    <div class="label">🔹 原始数据（不可操作）</div>
+    <div class="canvas-wrapper">
+        <canvas id="canvasOriginal"></canvas>
+    </div>
+
+    <div class="label">🔹 可编辑数据（点击/框选/方向键移动/Del删除）</div>
+    <div class="canvas-wrapper">
+        <canvas id="canvasEdit"></canvas>
+        <div id="selectionRect"></div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+        未加载图片 | 未加载JSON
+    </div>
+
+    <div class="info" id="info"></div>
+
+    <!-- 自动消失提示框 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const canvasOriginal = document.getElementById('canvasOriginal');
+        const ctxOriginal = canvasOriginal.getContext('2d');
+        const canvasEdit = document.getElementById('canvasEdit');
+        const ctxEdit = canvasEdit.getContext('2d');
+        const info = document.getElementById('info');
+        const selectionRect = document.getElementById('selectionRect');
+        const wrapperEdit = canvasEdit.parentElement;
+        const statusBar = document.getElementById('statusBar');
+        const dropArea = document.getElementById('dropArea');
+        const toast = document.getElementById('toast');
+
+        let img = null;
+        let originalCharData = null;
+        let originalLines = [];
+        let editLines = [];
+
+        let selectedLine = null;
+        let selectedLines = [];
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let scale = 1;
+
+        window.lastJsonFileName = null;
+        let currentImageName = "";
+        let currentJsonName = "";
+        let toastTimer = null;
+
+        // 5秒自动消失提示
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.style.display = 'block';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.style.display = 'none';
+            }, 5000);
+        }
+
+        function updateStatus() {
+            statusBar.textContent = 
+                `图片：${currentImageName || '未加载'} | JSON：${currentJsonName || '未加载'}`;
+        }
+
+        function clearAllData() {
+            img = null;
+            currentImageName = "";
+            originalCharData = null;
+            window.lastJsonFileName = null;
+            currentJsonName = "";
+            originalLines = [];
+            editLines = [];
+            selectedLine = null;
+            selectedLines = [];
+        }
+
+        function loadImageFile(file) {
+            clearAllData();
+            const url = URL.createObjectURL(file);
+            const i = new Image();
+            i.onload = () => {
+                img = i;
+                currentImageName = file.name;
+                canvasOriginal.width = img.width;
+                canvasOriginal.height = img.height;
+                canvasEdit.width = img.width;
+                canvasEdit.height = img.height;
+                redrawAll();
+                updateStatus();
+                showInfo();
+            };
+            i.src = url;
+        }
+
+        function loadJsonFile(file) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    originalCharData = JSON.parse(ev.target.result);
+                    window.lastJsonFileName = file.name;
+                    currentJsonName = file.name;
+
+                    originalLines = [];
+                    (originalCharData.chars || []).forEach((ch, i) => {
+                        originalLines.push({ type:'start', x:ch.col_start });
+                        originalLines.push({ type:'end', x:ch.col_end });
+                    });
+                    editLines = JSON.parse(JSON.stringify(originalLines));
+                    selectedLine = null;
+                    selectedLines = [];
+                    redrawAll();
+                    updateStatus();
+                    showInfo();
+                } catch (e) {
+                    showToast("JSON 格式错误");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('loadImgBtn').onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = e => {
+                if (e.target.files[0]) {
+                    loadImageFile(e.target.files[0]);
+                }
+            };
+            input.click();
+        };
+
+        document.getElementById('loadJsonBtn').onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                if (e.target.files[0]) {
+                    loadJsonFile(e.target.files[0]);
+                }
+            };
+            input.click();
+        };
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+            dropArea.addEventListener(evt, e => e.preventDefault());
+        });
+        dropArea.addEventListener('dragover', () => dropArea.classList.add('active'));
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('active'));
+        dropArea.addEventListener('drop', e => {
+            dropArea.classList.remove('active');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length === 0) return;
+
+            let imgFile = null;
+            let jsonFile = null;
+
+            files.forEach(f => {
+                if (f.type.startsWith('image/')) imgFile = f;
+                if (f.name.toLowerCase().endsWith('.json')) jsonFile = f;
+            });
+
+            if (imgFile) loadImageFile(imgFile);
+            if (jsonFile) loadJsonFile(jsonFile);
+        });
+
+        document.getElementById('resetBtn').onclick = () => {
+            if (!originalCharData) { showToast('无数据'); return; }
+            editLines = JSON.parse(JSON.stringify(originalLines));
+            selectedLine = null;
+            selectedLines = [];
+            redrawAll();
+            showInfo();
+            showToast('已重置为原始数据');
+        };
+
+        function redrawAll() {
+            drawCanvas(canvasOriginal, ctxOriginal, originalLines, false);
+            drawCanvas(canvasEdit, ctxEdit, editLines, true);
+        }
+
+        function drawCanvas(canvas, ctx, lines, allowSelect) {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            if (img) ctx.drawImage(img,0,0);
+            const h = img ? img.height : 1000;
+            lines.forEach(ln => {
+                let sel = false;
+                if (allowSelect) {
+                    sel = (selectedLine === ln || selectedLines.includes(ln));
+                }
+                ctx.beginPath();
+                ctx.moveTo(ln.x,0);
+                ctx.lineTo(ln.x,h);
+                ctx.lineWidth = sel ? 2 : 1;
+                ctx.strokeStyle = ln.type === 'start' ? '#ff0000' : '#00ff00';
+                ctx.stroke();
+            });
+        }
+
+        canvasEdit.onmousedown = (e) => {
+            const r = canvasEdit.getBoundingClientRect();
+            const x = e.clientX - r.left;
+            const y = e.clientY - r.top;
+            isDragging = true;
+            dragStart.x = x;
+            dragStart.y = y;
+            selectionRect.style.left = x+'px';
+            selectionRect.style.top = y+'px';
+            selectionRect.style.width='0px';
+            selectionRect.style.height='0px';
+            selectionRect.style.display='block';
+            selectedLine = null;
+            selectedLines = [];
+        };
+
+        canvasEdit.onmousemove = (e) => {
+            if (!isDragging) return;
+            const r = canvasEdit.getBoundingClientRect();
+            const px = e.clientX - r.left;
+            const py = e.clientY - r.top;
+            selectionRect.style.width = (px - dragStart.x)+'px';
+            selectionRect.style.height = (py - dragStart.y)+'px';
+        };
+
+        canvasEdit.onmouseup = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            selectionRect.style.display='none';
+            const r = canvasEdit.getBoundingClientRect();
+            const x = e.clientX - r.left;
+            const minX = Math.min(dragStart.x, x);
+            const maxX = Math.max(dragStart.x, x);
+            const dist = Math.abs(x - dragStart.x);
+
+            if (dist < 5) {
+                selectedLine = editLines.find(ln => Math.abs(ln.x - dragStart.x) <= 3) || null;
+                selectedLines = [];
+            } else {
+                selectedLine = null;
+                selectedLines = editLines.filter(ln => ln.x >= minX && ln.x <= maxX);
+            }
+            redrawAll();
+            showInfo();
+        };
+
+        document.getElementById('deleteBtn').onclick = () => {
+            deleteSelected();
+        };
+
+        function deleteSelected() {
+            let hasDelete = false;
+
+            if (selectedLine) {
+                editLines = editLines.filter(l => l !== selectedLine);
+                selectedLine = null;
+                hasDelete = true;
+            }
+
+            if (selectedLines.length > 0) {
+                editLines = editLines.filter(l => !selectedLines.includes(l));
+                selectedLines = [];
+                hasDelete = true;
+            }
+
+            if (!hasDelete) {
+                showToast("请先选中线条");
+                return;
+            }
+            redrawAll();
+            showInfo();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!selectedLine) return;
+
+            if (e.key === 'ArrowLeft') {
+                selectedLine.x -= 1;
+                redrawAll();
+                showInfo();
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowRight') {
+                selectedLine.x += 1;
+                redrawAll();
+                showInfo();
+                e.preventDefault();
+            }
+            if (e.key === 'Delete') {
+                deleteSelected();
+                e.preventDefault();
+            }
+        });
+
+        document.getElementById('saveJsonBtn').onclick = async () => {
+            if (!originalCharData) { showToast("请先加载JSON"); return; }
+
+            const starts = editLines.filter(l=>l.type==='start').map(l=>l.x).sort((a,b)=>a-b);
+            const ends = editLines.filter(l=>l.type==='end').map(l=>l.x).sort((a,b)=>a-b);
+            const newChars = [];
+            let i=0,j=0;
+            while (i<starts.length && j<ends.length) {
+                const s=starts[i], e=ends[j];
+                if (e>s+1) {
+                    newChars.push({col_start:s, col_end:e, width:e-s+1});
+                    i++;j++;
+                } else if (e<=s) j++;
+                else i++;
+            }
+
+            const output = { ...originalCharData, chars: newChars };
+            const blob = new Blob([JSON.stringify(output, null, 2)], {type:'application/json'});
+
+            let suggested = "corrected.json";
+            if (window.lastJsonFileName) {
+                suggested = window.lastJsonFileName.replace(/\.json$/i, '_marked.json');
+            }
+
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: suggested,
+                    types: [{accept:{'application/json':['.json']}}]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                showToast("导出成功！");
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        function showInfo() {
+            const total = editLines.length;
+            const s = editLines.filter(l=>l.type==='start').length;
+            const e = editLines.filter(l=>l.type==='end').length;
+            let txt = `可编辑线条：${total} (红：${s} 绿：${e})`;
+            if (selectedLine) txt += ` | 选中：x=${selectedLine.x|0}`;
+            if (selectedLines.length) txt += ` | 框选：${selectedLines.length} 根`;
+            info.textContent = txt;
+        }
+    </script>
+</body>
+</html>
