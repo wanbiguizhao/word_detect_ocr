@@ -1,0 +1,441 @@
+{
+  "line_id": 9,
+  "parent_image": "page_25.png",
+  "line_y_start": 1157,
+  "line_y_end": 1201,
+  "total_chars": 18,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      284
+    ],
+    [
+      1,
+      285,
+      328
+    ],
+    [
+      0,
+      329,
+      333
+    ],
+    [
+      1,
+      334,
+      366
+    ],
+    [
+      0,
+      367,
+      375
+    ],
+    [
+      1,
+      376,
+      413
+    ],
+    [
+      0,
+      414,
+      421
+    ],
+    [
+      1,
+      422,
+      432
+    ],
+    [
+      0,
+      433,
+      462
+    ],
+    [
+      1,
+      463,
+      501
+    ],
+    [
+      0,
+      502,
+      503
+    ],
+    [
+      1,
+      504,
+      545
+    ],
+    [
+      0,
+      546,
+      552
+    ],
+    [
+      1,
+      553,
+      563
+    ],
+    [
+      0,
+      564,
+      593
+    ],
+    [
+      1,
+      594,
+      632
+    ],
+    [
+      0,
+      633,
+      635
+    ],
+    [
+      1,
+      636,
+      676
+    ],
+    [
+      0,
+      677,
+      678
+    ],
+    [
+      1,
+      679,
+      717
+    ],
+    [
+      0,
+      718,
+      719
+    ],
+    [
+      1,
+      720,
+      761
+    ],
+    [
+      0,
+      762,
+      764
+    ],
+    [
+      1,
+      765,
+      806
+    ],
+    [
+      0,
+      807,
+      808
+    ],
+    [
+      1,
+      809,
+      844
+    ],
+    [
+      0,
+      845,
+      853
+    ],
+    [
+      1,
+      854,
+      891
+    ],
+    [
+      0,
+      892,
+      895
+    ],
+    [
+      1,
+      896,
+      935
+    ],
+    [
+      0,
+      936,
+      940
+    ],
+    [
+      1,
+      941,
+      979
+    ],
+    [
+      0,
+      980,
+      982
+    ],
+    [
+      1,
+      983,
+      995
+    ],
+    [
+      0,
+      996,
+      1278
+    ],
+    [
+      1,
+      1279,
+      1279
+    ],
+    [
+      0,
+      1280,
+      1731
+    ],
+    [
+      1,
+      1732,
+      1735
+    ],
+    [
+      0,
+      1736,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png",
+  "chars": [
+    {
+      "char_id": 0,
+      "type": "CHAR",
+      "col_start": 285,
+      "col_end": 328,
+      "abs_x_start": 285,
+      "abs_x_end": 328,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 44,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 1,
+      "type": "CHAR",
+      "col_start": 334,
+      "col_end": 366,
+      "abs_x_start": 334,
+      "abs_x_end": 366,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 33,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 2,
+      "type": "CHAR",
+      "col_start": 376,
+      "col_end": 413,
+      "abs_x_start": 376,
+      "abs_x_end": 413,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 38,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 3,
+      "type": "CHAR",
+      "col_start": 422,
+      "col_end": 432,
+      "abs_x_start": 422,
+      "abs_x_end": 432,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 11,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 4,
+      "type": "CHAR",
+      "col_start": 463,
+      "col_end": 501,
+      "abs_x_start": 463,
+      "abs_x_end": 501,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 5,
+      "type": "CHAR",
+      "col_start": 504,
+      "col_end": 545,
+      "abs_x_start": 504,
+      "abs_x_end": 545,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 42,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 6,
+      "type": "CHAR",
+      "col_start": 553,
+      "col_end": 563,
+      "abs_x_start": 553,
+      "abs_x_end": 563,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 11,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 7,
+      "type": "CHAR",
+      "col_start": 594,
+      "col_end": 632,
+      "abs_x_start": 594,
+      "abs_x_end": 632,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 8,
+      "type": "CHAR",
+      "col_start": 636,
+      "col_end": 676,
+      "abs_x_start": 636,
+      "abs_x_end": 676,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 41,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 9,
+      "type": "CHAR",
+      "col_start": 679,
+      "col_end": 717,
+      "abs_x_start": 679,
+      "abs_x_end": 717,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 10,
+      "type": "CHAR",
+      "col_start": 720,
+      "col_end": 761,
+      "abs_x_start": 720,
+      "abs_x_end": 761,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 42,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 11,
+      "type": "CHAR",
+      "col_start": 765,
+      "col_end": 806,
+      "abs_x_start": 765,
+      "abs_x_end": 806,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 42,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 12,
+      "type": "CHAR",
+      "col_start": 809,
+      "col_end": 844,
+      "abs_x_start": 809,
+      "abs_x_end": 844,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 36,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 13,
+      "type": "CHAR",
+      "col_start": 854,
+      "col_end": 891,
+      "abs_x_start": 854,
+      "abs_x_end": 891,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 38,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 14,
+      "type": "CHAR",
+      "col_start": 896,
+      "col_end": 935,
+      "abs_x_start": 896,
+      "abs_x_end": 935,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 40,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 15,
+      "type": "CHAR",
+      "col_start": 941,
+      "col_end": 979,
+      "abs_x_start": 941,
+      "abs_x_end": 979,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 16,
+      "type": "CHAR",
+      "col_start": 983,
+      "col_end": 995,
+      "abs_x_start": 983,
+      "abs_x_end": 995,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 13,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    },
+    {
+      "char_id": 18,
+      "type": "CHAR",
+      "col_start": 1732,
+      "col_end": 1735,
+      "abs_x_start": 1732,
+      "abs_x_end": 1735,
+      "abs_y_start": 1157,
+      "abs_y_end": 1201,
+      "width": 4,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_9_marked.png"
+    }
+  ]
+}

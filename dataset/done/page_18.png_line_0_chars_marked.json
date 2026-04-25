@@ -1,0 +1,26 @@
+{
+  "line_id": 0,
+  "parent_image": "page_18.png",
+  "line_y_start": 176,
+  "line_y_end": 191,
+  "total_chars": 1,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      1473
+    ],
+    [
+      1,
+      1474,
+      1498
+    ],
+    [
+      0,
+      1499,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_18.png_line_0_marked.png",
+  "chars": []
+}

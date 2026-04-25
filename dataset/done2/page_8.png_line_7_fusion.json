@@ -1,0 +1,381 @@
+{
+  "line_info": {
+    "line_id": 7,
+    "parent_image": "page_8.png",
+    "line_y_start": 932,
+    "line_y_end": 974
+  },
+  "count_info": {
+    "原始字符数": 9,
+    "最终字符数": 7
+  },
+  "fusion_chars": [
+    {
+      "type": "CHAR",
+      "start": 293,
+      "end": 335,
+      "width": 43,
+      "raw": {
+        "char_id": 1,
+        "type": "CHAR",
+        "col_start": 293,
+        "col_end": 335,
+        "abs_x_start": 293,
+        "abs_x_end": 335,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 43,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 336,
+          "end": 337,
+          "width": 2,
+          "raw": [
+            0,
+            336,
+            337
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7205,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 338,
+      "end": 376,
+      "width": 39,
+      "raw": {
+        "char_id": 2,
+        "type": "CHAR",
+        "col_start": 338,
+        "col_end": 376,
+        "abs_x_start": 338,
+        "abs_x_end": 376,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 39,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 377,
+          "end": 381,
+          "width": 5,
+          "raw": [
+            0,
+            377,
+            381
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7226,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 382,
+      "end": 422,
+      "width": 41,
+      "raw": {
+        "char_id": 3,
+        "type": "CHAR",
+        "col_start": 382,
+        "col_end": 422,
+        "abs_x_start": 382,
+        "abs_x_end": 422,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 41,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 423,
+          "end": 424,
+          "width": 2,
+          "raw": [
+            0,
+            423,
+            424
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7218,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 425,
+      "end": 464,
+      "width": 40,
+      "raw": {
+        "char_id": 4,
+        "type": "CHAR",
+        "col_start": 425,
+        "col_end": 464,
+        "abs_x_start": 425,
+        "abs_x_end": 464,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 40,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 465,
+          "end": 466,
+          "width": 2,
+          "raw": [
+            0,
+            465,
+            466
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7238,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 467,
+      "end": 505,
+      "width": 39,
+      "raw": null,
+      "is_merged": true,
+      "merged_from": [
+        {
+          "char_id": 5,
+          "type": "CHAR",
+          "col_start": 467,
+          "col_end": 488,
+          "abs_x_start": 467,
+          "abs_x_end": 488,
+          "abs_y_start": 932,
+          "abs_y_end": 974,
+          "width": 22,
+          "height": 42,
+          "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+        },
+        {
+          "char_id": 6,
+          "type": "CHAR",
+          "col_start": 490,
+          "col_end": 505,
+          "abs_x_start": 490,
+          "abs_x_end": 505,
+          "abs_y_start": 932,
+          "abs_y_end": 974,
+          "width": 16,
+          "height": 42,
+          "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+        }
+      ],
+      "merged_blank": {
+        "type": "BLANK",
+        "start": 489,
+        "end": 489,
+        "width": 1,
+        "raw": [
+          0,
+          489,
+          489
+        ],
+        "is_attached": false
+      },
+      "blank_prob_mean": 0.7269,
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 506,
+          "end": 510,
+          "width": 5,
+          "raw": [
+            0,
+            506,
+            510
+          ],
+          "is_attached": true
+        }
+      ],
+      "merge_trigger": {
+        "left_char_width": 22,
+        "right_char_width": 16,
+        "min_char_width": 30,
+        "left_triggered": true,
+        "right_triggered": true
+      },
+      "prob": 0.7178,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 511,
+      "end": 550,
+      "width": 40,
+      "raw": {
+        "char_id": 7,
+        "type": "CHAR",
+        "col_start": 511,
+        "col_end": 550,
+        "abs_x_start": 511,
+        "abs_x_end": 550,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 40,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 551,
+          "end": 554,
+          "width": 4,
+          "raw": [
+            0,
+            551,
+            554
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7195,
+      "is_garbage": false
+    },
+    {
+      "type": "CHAR",
+      "start": 555,
+      "end": 566,
+      "width": 12,
+      "raw": {
+        "char_id": 8,
+        "type": "CHAR",
+        "col_start": 555,
+        "col_end": 566,
+        "abs_x_start": 555,
+        "abs_x_end": 566,
+        "abs_y_start": 932,
+        "abs_y_end": 974,
+        "width": 12,
+        "height": 42,
+        "marked_line_path": "output\\lines_marked\\page_8.png_line_7_marked.png"
+      },
+      "is_merged": false,
+      "merged_from": [],
+      "attached_blanks": [
+        {
+          "type": "BLANK",
+          "start": 567,
+          "end": 583,
+          "width": 17,
+          "raw": [
+            0,
+            567,
+            583
+          ],
+          "is_attached": true
+        },
+        {
+          "type": "BLANK",
+          "start": 585,
+          "end": 978,
+          "width": 394,
+          "raw": [
+            0,
+            585,
+            978
+          ],
+          "is_attached": true
+        },
+        {
+          "type": "BLANK",
+          "start": 980,
+          "end": 1714,
+          "width": 735,
+          "raw": [
+            0,
+            980,
+            1714
+          ],
+          "is_attached": true
+        },
+        {
+          "type": "BLANK",
+          "start": 1716,
+          "end": 2014,
+          "width": 299,
+          "raw": [
+            0,
+            1716,
+            2014
+          ],
+          "is_attached": true
+        }
+      ],
+      "prob": 0.7034,
+      "is_garbage": false
+    }
+  ],
+  "chars": [
+    {
+      "col_start": 293,
+      "col_end": 335,
+      "width": 43
+    },
+    {
+      "col_start": 338,
+      "col_end": 376,
+      "width": 39
+    },
+    {
+      "col_start": 382,
+      "col_end": 422,
+      "width": 41
+    },
+    {
+      "col_start": 425,
+      "col_end": 464,
+      "width": 40
+    },
+    {
+      "col_start": 467,
+      "col_end": 505,
+      "width": 39
+    },
+    {
+      "col_start": 511,
+      "col_end": 550,
+      "width": 40
+    },
+    {
+      "col_start": 555,
+      "col_end": 566,
+      "width": 12
+    }
+  ]
+}

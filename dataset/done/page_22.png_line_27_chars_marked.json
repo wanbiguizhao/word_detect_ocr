@@ -1,0 +1,107 @@
+{
+  "line_id": 27,
+  "parent_image": "page_22.png",
+  "line_y_start": 2746,
+  "line_y_end": 2783,
+  "total_chars": 6,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      242
+    ],
+    [
+      1,
+      243,
+      252
+    ],
+    [
+      0,
+      253,
+      277
+    ],
+    [
+      1,
+      278,
+      291
+    ],
+    [
+      0,
+      292,
+      298
+    ],
+    [
+      1,
+      299,
+      320
+    ],
+    [
+      0,
+      321,
+      324
+    ],
+    [
+      1,
+      325,
+      345
+    ],
+    [
+      0,
+      346,
+      346
+    ],
+    [
+      1,
+      347,
+      371
+    ],
+    [
+      0,
+      372,
+      394
+    ],
+    [
+      1,
+      395,
+      403
+    ],
+    [
+      0,
+      404,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_22.png_line_27_marked.png",
+  "chars": [
+    {
+      "col_start": 243,
+      "col_end": 252,
+      "width": 10
+    },
+    {
+      "col_start": 278,
+      "col_end": 291,
+      "width": 14
+    },
+    {
+      "col_start": 299,
+      "col_end": 320,
+      "width": 22
+    },
+    {
+      "col_start": 325,
+      "col_end": 345,
+      "width": 21
+    },
+    {
+      "col_start": 347,
+      "col_end": 371,
+      "width": 25
+    },
+    {
+      "col_start": 395,
+      "col_end": 403,
+      "width": 9
+    }
+  ]
+}

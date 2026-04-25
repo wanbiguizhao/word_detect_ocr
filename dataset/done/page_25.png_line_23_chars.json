@@ -1,0 +1,339 @@
+{
+  "line_id": 23,
+  "parent_image": "page_25.png",
+  "line_y_start": 2374,
+  "line_y_end": 2418,
+  "total_chars": 14,
+  "segments_type_start_end": [
+    [
+      0,
+      0,
+      149
+    ],
+    [
+      1,
+      150,
+      185
+    ],
+    [
+      0,
+      186,
+      192
+    ],
+    [
+      1,
+      193,
+      231
+    ],
+    [
+      0,
+      232,
+      235
+    ],
+    [
+      1,
+      236,
+      274
+    ],
+    [
+      0,
+      275,
+      277
+    ],
+    [
+      1,
+      278,
+      317
+    ],
+    [
+      0,
+      318,
+      322
+    ],
+    [
+      1,
+      323,
+      360
+    ],
+    [
+      0,
+      361,
+      364
+    ],
+    [
+      1,
+      365,
+      405
+    ],
+    [
+      0,
+      406,
+      409
+    ],
+    [
+      1,
+      410,
+      449
+    ],
+    [
+      0,
+      450,
+      452
+    ],
+    [
+      1,
+      453,
+      493
+    ],
+    [
+      0,
+      494,
+      495
+    ],
+    [
+      1,
+      496,
+      534
+    ],
+    [
+      0,
+      535,
+      539
+    ],
+    [
+      1,
+      540,
+      576
+    ],
+    [
+      0,
+      577,
+      579
+    ],
+    [
+      1,
+      580,
+      622
+    ],
+    [
+      0,
+      623,
+      623
+    ],
+    [
+      1,
+      624,
+      665
+    ],
+    [
+      0,
+      666,
+      669
+    ],
+    [
+      1,
+      670,
+      711
+    ],
+    [
+      0,
+      712,
+      714
+    ],
+    [
+      1,
+      715,
+      725
+    ],
+    [
+      0,
+      726,
+      2014
+    ]
+  ],
+  "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png",
+  "chars": [
+    {
+      "char_id": 0,
+      "type": "CHAR",
+      "col_start": 150,
+      "col_end": 185,
+      "abs_x_start": 150,
+      "abs_x_end": 185,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 36,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 1,
+      "type": "CHAR",
+      "col_start": 193,
+      "col_end": 231,
+      "abs_x_start": 193,
+      "abs_x_end": 231,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 2,
+      "type": "CHAR",
+      "col_start": 236,
+      "col_end": 274,
+      "abs_x_start": 236,
+      "abs_x_end": 274,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 3,
+      "type": "CHAR",
+      "col_start": 278,
+      "col_end": 317,
+      "abs_x_start": 278,
+      "abs_x_end": 317,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 40,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 4,
+      "type": "CHAR",
+      "col_start": 323,
+      "col_end": 360,
+      "abs_x_start": 323,
+      "abs_x_end": 360,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 38,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 5,
+      "type": "CHAR",
+      "col_start": 365,
+      "col_end": 405,
+      "abs_x_start": 365,
+      "abs_x_end": 405,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 41,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 6,
+      "type": "CHAR",
+      "col_start": 410,
+      "col_end": 449,
+      "abs_x_start": 410,
+      "abs_x_end": 449,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 40,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 7,
+      "type": "CHAR",
+      "col_start": 453,
+      "col_end": 493,
+      "abs_x_start": 453,
+      "abs_x_end": 493,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 41,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 8,
+      "type": "CHAR",
+      "col_start": 496,
+      "col_end": 534,
+      "abs_x_start": 496,
+      "abs_x_end": 534,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 39,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 9,
+      "type": "CHAR",
+      "col_start": 540,
+      "col_end": 576,
+      "abs_x_start": 540,
+      "abs_x_end": 576,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 37,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 10,
+      "type": "CHAR",
+      "col_start": 580,
+      "col_end": 622,
+      "abs_x_start": 580,
+      "abs_x_end": 622,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 43,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 11,
+      "type": "CHAR",
+      "col_start": 624,
+      "col_end": 665,
+      "abs_x_start": 624,
+      "abs_x_end": 665,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 42,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 12,
+      "type": "CHAR",
+      "col_start": 670,
+      "col_end": 711,
+      "abs_x_start": 670,
+      "abs_x_end": 711,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 42,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    },
+    {
+      "char_id": 13,
+      "type": "CHAR",
+      "col_start": 715,
+      "col_end": 725,
+      "abs_x_start": 715,
+      "abs_x_end": 725,
+      "abs_y_start": 2374,
+      "abs_y_end": 2418,
+      "width": 11,
+      "height": 44,
+      "marked_line_path": "output\\lines_marked\\page_25.png_line_23_marked.png"
+    }
+  ]
+}
