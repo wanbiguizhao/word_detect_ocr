@@ -38,7 +38,7 @@
       <div class="card">
         <div class="card-header">
           <h3>规则切割结果</h3>
-          <a-button size="small" type="primary" @click="useRuleLines">使用规则切割</a-button>
+          <a-button size="large" type="primary" @click="useRuleLines">使用规则切割</a-button>
         </div>
         <div class="card-body">
           <LineCanvas 
@@ -55,7 +55,7 @@
       <div class="card">
         <div class="card-header">
           <h3>模型切割</h3>
-          <a-button size="small" type="primary" @click="useModelLines">使用模型切割</a-button>
+          <a-button size="large" type="primary" @click="useModelLines">使用模型切割</a-button>
         </div>
         <div class="card-body">
           <LineCanvas 
@@ -72,7 +72,7 @@
       <div class="card">
         <div class="card-header">
           <h3>融合切割</h3>
-          <a-button size="small" type="primary" @click="useFusionLines">使用融合切割</a-button>
+          <a-button size="large" type="primary" @click="useFusionLines">使用融合切割</a-button>
         </div>
         <div class="card-body">
           <LineCanvas 
@@ -97,25 +97,28 @@
           <div class="action-buttons">
             <a-space wrap>
               <!-- 单一统一复制按钮 -->
-              <a-button type="primary" @click="copySelectedLine">复制选中分割线</a-button>
+              <a-button type="primary" size="large" @click="copySelectedLine">复制选中分割线</a-button>
               <a-divider type="vertical" />
-              <a-button danger @click="deleteSelectedLines">删除选中线</a-button>
-              <a-button @click="clearAllLines">清空所有线</a-button>
-              <a-divider type="vertical" />
-              <a-button type="success" @click="save">保存标注</a-button>
-              <a-button type="default" @click="postpone">暂不标注</a-button>
+              <a-button danger size="large" @click="deleteSelectedLines">删除选中线</a-button>
+              <a-button size="large" @click="clearAllLines">清空所有线</a-button>
             </a-space>
-          </div>
-          <div class="operation-tips">
-            <a-tooltip title="点击选中线条，Ctrl+左键拖拽框选多个线条">
-              <span>操作提示: 点击选中线条，Ctrl+左键拖拽框选多个线条，左右箭头微调位置</span>
-            </a-tooltip>
           </div>
           <LineCanvas
             :image-url="imgUrl"
             v-model:lines="editLines"
             v-model:selected-indexes="editSelected"
           />
+          <div class="operation-tips">
+            <a-tooltip title="点击选中线条，Ctrl+左键拖拽框选多个线条">
+              <span>操作提示: 点击选中线条，Ctrl+左键拖拽框选多个线条，左右箭头微调位置</span>
+            </a-tooltip>
+          </div>
+          <div class="action-buttons">
+            <a-space wrap>
+              <a-button type="success" size="large" style="border: 2px solid #52c41a; border-radius: 4px;" @click="save">保存标注</a-button>
+              <a-button type="default" size="large" @click="postpone">暂不标注</a-button>
+            </a-space>
+          </div>
         </div>
       </div>
     </div>
@@ -243,6 +246,8 @@ const save = async () => {
   try {
     await axios.post(`http://localhost:5000/api/images/${imageId}/annotate`, { lines: editLines.value })
     alert('保存成功！')
+    // 更新localStorage，通知主页面刷新
+    localStorage.setItem('annotationUpdated', Date.now().toString())
   } catch (error) {
     alert('保存失败，请重试')
     console.error('保存失败:', error)
@@ -254,6 +259,8 @@ const postpone = async () => {
   try {
     await axios.post(`http://localhost:5000/api/images/${imageId}/postpone`)
     alert('已标记为暂不标注！')
+    // 更新localStorage，通知主页面刷新
+    localStorage.setItem('annotationUpdated', Date.now().toString())
   } catch (error) {
     alert('操作失败，请重试')
     console.error('暂不标注失败:', error)
