@@ -111,7 +111,7 @@ def train_classifier():
     all_img_paths = []
     all_label_paths = []
     for img_path in Path(config.DATA_DIR).glob("*.png"):
-        label_path = Path(config.DATA_DIR) / f"{img_path.stem}_fusion.json"
+        label_path = Path(config.DATA_DIR) / f"{img_path.stem}.json"
         if label_path.exists():
             all_img_paths.append(img_path)
             all_label_paths.append(label_path)

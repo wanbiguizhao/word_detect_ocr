@@ -22,7 +22,7 @@ class CharSegmentInfer:
     def __init__(self, batch_size=32):
         self.device = config.DEVICE
         self.model = CharSegmentClassifier(config.PRETRAINED_AE_PATH).to(self.device)
-        self.model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=self.device))
+        self.model.load_state_dict(torch.load(config.PRETRAINED_MODEL_PATH, map_location=self.device))
         self.model.eval()
         print("✅ 模型加载成功！")
 
@@ -52,11 +52,11 @@ class CharSegmentInfer:
     def patch_to_tensor(self, img_patch_gray):
         # 1. 转RGB
         patch_rgb = img_patch_gray.convert("RGB")
-        
+
         # 2. 极速转换：PIL -> bytes -> PyTorch Tensor
         patch_tensor = torch.frombuffer(patch_rgb.tobytes(), dtype=torch.uint8)
         patch_tensor = patch_tensor.view(self.target_height, self.crop_width, 3)
-        
+
         # 3. 训练同款黄线：纯张量操作
         patch_tensor[:, self.mid_col, 0] = 255
         patch_tensor[:, self.mid_col, 1] = 255
@@ -74,7 +74,7 @@ class CharSegmentInfer:
 
         x_start = 0
         total_steps = W - self.crop_width + 1
-        
+
         # 裁剪patch
         with tqdm(total=total_steps, desc="裁剪patch") as pbar:
             while x_start + self.crop_width <= W:
@@ -155,14 +155,14 @@ class CharSegmentInfer:
         for col in range(W):  # 遍历每一列
             prob = prob_dict.get(col, 0.0)  # 无预测的列概率记为0
             prob_percent = prob * 100  # 转百分比（0~100）
-            
+
             # 计算黄色条高度：96-100%→50像素，91-95%→49像素，以此类推
             # 公式：高度 = 50 - ((100 - 概率值) // 5)，最小为0
             bar_height = math.ceil(prob_percent*0.5)
             if bar_height > 0:
                 # 黄色条绘制范围：y从H到H+bar_height-1（因为是闭区间）
                 y_start = H+self.prob_height-bar_height
-                y_end = H + self.prob_height 
+                y_end = H + self.prob_height
                 # 绘制黄色竖线（每列的概率条）
                 draw.line([(col, y_start), (col, y_end)], fill=(255, 255, 0), width=1)
 
@@ -185,10 +185,10 @@ class CharSegmentInfer:
 
 if __name__ == "__main__":
     infer = CharSegmentInfer(batch_size=64)
-    
+
     input_img = Path(__file__).parent / "page_28.png_line_15.png"
     output_img = Path(__file__).parent/"temp" / "my_segment_result.png"
-    
+
     char_boxes, pred_probs = infer.infer_whole_line(str(input_img), str(output_img))
     print(f"识别到 {len(char_boxes)} 个字符: {char_boxes}")
     # 可选：打印前10列的概率，方便调试

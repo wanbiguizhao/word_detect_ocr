@@ -33,7 +33,7 @@ class CharSegmentInfer:
         # 模型初始化
         self.device = config.DEVICE
         self.model = CharSegmentClassifier(config.PRETRAINED_AE_PATH).to(self.device)
-        self.model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=self.device))
+        self.model.load_state_dict(torch.load(config.PRETRAINED_MODEL_PATH, map_location=self.device))
         self.model.eval()
         print("✅ 模型加载成功！")
 
@@ -70,7 +70,7 @@ class CharSegmentInfer:
         patch_rgb = img_patch_gray.convert("RGB")
         patch_tensor = torch.frombuffer(patch_rgb.tobytes(), dtype=torch.uint8)
         patch_tensor = patch_tensor.view(self.target_height, self.crop_width, 3)
-        
+
         # 训练同款黄线标记
         patch_tensor[:, self.mid_col, 0] = 255
         patch_tensor[:, self.mid_col, 1] = 255
@@ -190,7 +190,7 @@ class CharSegmentInfer:
         """单张图片推理：可视化 + JSON保存"""
         img_gray, predictions, probs = self.predict_batch(img_path)
         boxes = self.get_char_boundaries(predictions)
-        
+
         # 路径处理
         img_stem = Path(img_path).stem
         save_dir = Path(save_dir) or Path(img_path).parent
