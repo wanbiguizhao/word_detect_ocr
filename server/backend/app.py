@@ -109,10 +109,14 @@ async def get_images(request: Request):
     sample_list = load_json_file(TOP_SAMPLES_PATH)
     items = []
     target = None
+    postpone_target = None
+    
     if is_annotated == "true":
         target = True
     elif is_annotated == "false":
         target = False
+    elif is_annotated == "pending":
+        postpone_target = True
 
     for sample in sample_list or []:
         img_name = sample.get("img_name", "")
@@ -123,19 +127,27 @@ async def get_images(request: Request):
         anno_file = ANNOTATIONS_DIR / f"{img_name}.json"
         anno_data = load_json_file(anno_file)
         annotated = anno_data.get("is_annotated", False) if anno_data else False
+        is_postponed = anno_data.get("is_postponed", False) if anno_data else False
         updated_at = anno_data.get("updated_at", "") if anno_data else ""
 
-        if target is not None and annotated != target:
-            continue
+        # 根据筛选条件过滤
+        if postpone_target is not None:
+            if not is_postponed:
+                continue
+        elif target is not None:
+            if annotated != target or is_postponed:
+                continue
 
         items.append({
             "id": img_name,
             "image_name": f"{img_name}.png",
             "score": round(total_score, 4),
             "is_annotated": annotated,
+            "is_postponed": is_postponed,
             "updated_at": updated_at
         })
-    return {"code": 0, "msg": "success", "data": items}
+    
+    return {"code": 0, "msg": "success", "data": items, "total": len(items)}
 
 # ======================================
 # 🔥 2. 【核心修复】恢复详情接口 + 支持特殊字符（解决404）
@@ -167,6 +179,8 @@ def get_detail(image_id: str):
     # 🔥 加载你的标注数据（恢复显示）
     anno_data = load_json_file(ANNOTATIONS_DIR / f"{image_id}.json") or {}
     annotation_lines = chars_to_lines(anno_data.get("chars", []), img_width)
+    is_annotated = anno_data.get("is_annotated", False) if anno_data else False
+    is_postponed = anno_data.get("is_postponed", False) if anno_data else False
 
     return {
         "code": 0,
@@ -175,6 +189,8 @@ def get_detail(image_id: str):
             "id": image_id,
             "image_name": img_path.name,
             "image_url": f"/api/images/{image_id}/raw",
+            "is_annotated": is_annotated,
+            "is_postponed": is_postponed,
             "rule_lines": rule_lines,
             "model_lines": model_lines,
             "fusion_lines": fusion_lines,
@@ -194,6 +210,7 @@ def save_anno(image_id: str, body: AnnotationSubmit):
     anno_data = {
         "image_name": f"{image_id}.png",
         "is_annotated": True,
+        "is_postponed": False,
         "chars": chars_list,
         "updated_at": datetime.datetime.now().isoformat()
     }
@@ -203,6 +220,34 @@ def save_anno(image_id: str, body: AnnotationSubmit):
         json.dump(anno_data, f, ensure_ascii=False, indent=2)
 
     return {"code": 0, "msg": "保存成功"}
+
+# ======================================
+# 3.1 暂不标注接口
+# ======================================
+@app.post("/api/images/{image_id:path}/postpone")
+def postpone_anno(image_id: str):
+    save_path = ANNOTATIONS_DIR / f"{image_id}.json"
+    
+    if save_path.exists():
+        anno_data = load_json_file(save_path)
+        if anno_data:
+            anno_data["is_annotated"] = True
+            anno_data["is_postponed"] = True
+            anno_data["updated_at"] = datetime.datetime.now().isoformat()
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(anno_data, f, ensure_ascii=False, indent=2)
+    else:
+        anno_data = {
+            "image_name": f"{image_id}.png",
+            "is_annotated": True,
+            "is_postponed": True,
+            "chars": [],
+            "updated_at": datetime.datetime.now().isoformat()
+        }
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(anno_data, f, ensure_ascii=False, indent=2)
+
+    return {"code": 0, "msg": "已标记为暂不标注"}
 
 # ======================================
 # 4. 图片预览接口
