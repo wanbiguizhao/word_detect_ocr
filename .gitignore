@@ -164,3 +164,9 @@ dataset/*
 !dataset/done2
 !dataset/*.md
 !dataset/*.py
+*.pth
+.vscode/*
+.ocr_venv
+server/backend/dataset/*
+server/frontend/.vscode 
+

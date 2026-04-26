@@ -187,7 +187,7 @@ if __name__ == "__main__":
     infer = CharSegmentInfer(batch_size=64)
     
     input_img = Path(__file__).parent / "page_28.png_line_15.png"
-    output_img = Path(__file__).parent / "my_segment_result.png"
+    output_img = Path(__file__).parent/"temp" / "my_segment_result.png"
     
     char_boxes, pred_probs = infer.infer_whole_line(str(input_img), str(output_img))
     print(f"识别到 {len(char_boxes)} 个字符: {char_boxes}")
