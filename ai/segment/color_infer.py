@@ -22,7 +22,7 @@ class CharSegmentInfer:
     def __init__(self, batch_size=32):
         self.device = config.DEVICE
         self.model = CharSegmentClassifier(config.PRETRAINED_AE_PATH).to(self.device)
-        self.model.load_state_dict(torch.load(config.PRETRAINED_MODEL_PATH, map_location=self.device))
+        self.model.load_state_dict(torch.load(config.PRETRAINED_CHAR_SEGMENT_MODEL_PATH, map_location=self.device))
         self.model.eval()
         print("✅ 模型加载成功！")
 

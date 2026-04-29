@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # 根目录
 DATA_DIR = BASE_DIR/"dataset"/"done2"                                      # 数据集目录
 PRETRAINED_AE_PATH = BASE_DIR/"ai"/"model_storage"/"feature_model.pth"                        # 预训练自编码器权重
-PRETRAINED_MODEL_PATH = BASE_DIR/"ai"/"model_storage"/"char_segment_classifier.pth"  # 预训练分割模型权重
+PRETRAINED_CHAR_SEGMENT_MODEL_PATH = BASE_DIR/"ai"/"model_storage"/"char_segment_classifier_0427.pth"  # 预训练分割模型权重
 MODEL_SAVE_PATH = BASE_DIR/"char_segment_classifier_new.pth"  # 新训练模型保存路径
 
 # ===================== 训练超参数 =====================

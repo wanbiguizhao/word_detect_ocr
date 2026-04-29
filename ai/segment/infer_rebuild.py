@@ -33,7 +33,7 @@ class CharSegmentInfer:
         # 模型初始化
         self.device = config.DEVICE
         self.model = CharSegmentClassifier(config.PRETRAINED_AE_PATH).to(self.device)
-        self.model.load_state_dict(torch.load(config.PRETRAINED_MODEL_PATH, map_location=self.device))
+        self.model.load_state_dict(torch.load(config.PRETRAINED_CHAR_SEGMENT_MODEL_PATH, map_location=self.device))
         self.model.eval()
         print("✅ 模型加载成功！")
 
@@ -70,7 +70,7 @@ class CharSegmentInfer:
         patch_rgb = img_patch_gray.convert("RGB")
         patch_tensor = torch.frombuffer(patch_rgb.tobytes(), dtype=torch.uint8)
         patch_tensor = patch_tensor.view(self.target_height, self.crop_width, 3)
-
+        
         # 训练同款黄线标记
         patch_tensor[:, self.mid_col, 0] = 255
         patch_tensor[:, self.mid_col, 1] = 255
@@ -190,7 +190,7 @@ class CharSegmentInfer:
         """单张图片推理：可视化 + JSON保存"""
         img_gray, predictions, probs = self.predict_batch(img_path)
         boxes = self.get_char_boundaries(predictions)
-
+        
         # 路径处理
         img_stem = Path(img_path).stem
         save_dir = Path(save_dir) or Path(img_path).parent
@@ -217,13 +217,13 @@ class CharSegmentInfer:
             print("❌ 未找到图片")
             return
 
-        print(f"\n🚀 批量推理：{len(img_files)} 张图片")
-        for img_file in tqdm(img_files, desc="处理中"):
+        print(f"🚀 批量推理：{len(img_files)} 张图片")
+        for img_file in tqdm(img_files, desc="处理中", leave=True):
             try:
                 self.infer_single_image(str(img_file), save_dir, save_vis)
             except Exception as e:
-                print(f"\n❌ 处理失败 {img_file.name}: {str(e)}")
-        print(f"\n✅ 批量推理完成！")
+                tqdm.write(f"❌ 处理失败 {img_file.name}: {str(e)}")
+        print(f"✅ 批量推理完成！")
 
     # ====================== 推理接口：单行测试（兼容旧代码） ======================
     def infer_whole_line(self, line_img_path: str, save_path: str = "result_line.png") -> List[Tuple[int, int]]:

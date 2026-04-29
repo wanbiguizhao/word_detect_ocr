@@ -1,5 +1,6 @@
 import json
 import os
+import math
 from pathlib import Path
 import numpy as np
 from typing import Dict, List, Tuple, Any
@@ -226,7 +227,8 @@ def draw_visual_on_original(
     model_boxes: List[Tuple[int,int]],
     fusion_boxes: List[Tuple[int,int]],
     save_path: str,
-    cfg: FusionConfig
+    cfg: FusionConfig,
+    model_probs: List[Tuple[int, float]] = []
 ):
     """四层对比可视化"""
     if not Path(original_img_path).exists():
@@ -289,9 +291,38 @@ def draw_visual_on_original(
         d_fusion.line([(e, 0), (e, H)], fill=cfg.end_color, width=cfg.cut_line_width)
     canvas.paste(fusion_img, (0, current_y))
 
+    # 5. 绘制概率可视化（新增）
+    prob_height = 50
+    prob_canvas = Image.new("RGB", (W, prob_height), (255, 255, 255))
+    prob_draw = ImageDraw.Draw(prob_canvas)
+    
+    # 先构建「列位置→概率值」的映射（处理可能的列缺失）
+    prob_dict = {col: prob for col, prob in model_probs}
+    for col in range(W):  # 遍历每一列
+        prob = prob_dict.get(col, 0.0)  # 无预测的列概率记为0
+        prob_percent = prob * 100  # 转百分比（0~100）
+
+        # 计算黄色条高度：96-100%→50像素，91-95%→49像素，以此类推
+        # 公式：高度 = 50 - ((100 - 概率值) // 5)，最小为0
+        bar_height = math.ceil(prob_percent*0.5)
+        if bar_height > 0:
+            # 黄色条绘制范围：y从H到H+bar_height-1（因为是闭区间）
+            y_start = prob_height-bar_height
+            y_end = prob_height
+            # 绘制黄色竖线（每列的概率条）
+            prob_draw.line([(col, y_start), (col, y_end)], fill=(255, 255, 0), width=1)
+    
+    # 红色分隔线
+    prob_draw.line([(0, 0), (W, 0)], fill=(255, 0, 0), width=1)
+    
+    # 将概率图拼接到主图下方
+    new_canvas = Image.new("RGB", (W, total_height + prob_height), (255, 255, 255))
+    new_canvas.paste(canvas, (0, 0))
+    new_canvas.paste(prob_canvas, (0, total_height))
+
     # 保存图片
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(save_path)
+    new_canvas.save(save_path)
     print(f"✅ 可视化图已保存：{save_path}")
 
 # ====================== 4. 单文件处理函数（仅修改乱码处理部分，其余保留） ======================
@@ -362,8 +393,9 @@ def process_single_image(img_path: Path, cfg: FusionConfig) -> bool:
     # ===== 修改：过滤掉乱码字符，避免可视化绘制 =====
     fusion_boxes = [(c["start"], c["end"]) for c in final if c["type"] == "CHAR" and not c.get("is_garbage", False)]
 
-    # 7. 生成可视化图片
-    draw_visual_on_original(str(img_path), rule_boxes, model_boxes, fusion_boxes, str(output_img_path), cfg)
+    # 7. 生成可视化图片（新增概率可视化）
+    prob_tuples = [(i, prob) for i, prob in enumerate(model_probs)]
+    draw_visual_on_original(str(img_path), rule_boxes, model_boxes, fusion_boxes, str(output_img_path), cfg, prob_tuples)
 
     # 8. 构建最终结果（含新增chars字段 - 仅保留非乱码字符）
     new_chars_list = []
