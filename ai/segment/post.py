@@ -29,11 +29,6 @@ class FusionConfig:
         self.OUTPUT_JSON_DIR = Path("fusion_results/json")  # 合并结果JSON保存目录
         self.OUTPUT_IMG_DIR = Path("fusion_results/visual")  # 可视化图片保存目录
 
-        # 创建所有目录（不存在则自动创建）
-        for dir_path in [self.IMAGE_DIR, self.RULE_JSON_DIR, self.MODEL_JSON_DIR,
-                         self.OUTPUT_JSON_DIR, self.OUTPUT_IMG_DIR]:
-            dir_path.mkdir(parents=True, exist_ok=True)
-
 # ====================== 2. 工具函数（复用+补充批量适配） ======================
 def load_json(file_path: str) -> Dict:
     """加载JSON文件（增加更友好的异常提示）"""
@@ -218,7 +213,7 @@ def remove_garbage_chars(elements: List[Dict]) -> List[Dict]:
     # 2. 重新挂载空白段（因为移除字符后，空白段的挂载关系可能失效）
     clean_elements = attach_blanks(clean_elements)
     
-    print(f"🔍 移除了 {removed_count} 个乱码字符")
+    print(f"[INFO] 移除了 {removed_count} 个乱码字符")
     return clean_elements
 
 def draw_visual_on_original(
@@ -232,13 +227,13 @@ def draw_visual_on_original(
 ):
     """四层对比可视化"""
     if not Path(original_img_path).exists():
-        print(f"❌ 原始图片不存在：{original_img_path}")
+        print(f"[ERROR] 原始图片不存在：{original_img_path}")
         return
     
     try:
         base_img = Image.open(original_img_path).convert("RGB")
     except Exception as e:
-        print(f"❌ 加载图片失败：{e}")
+        print(f"[ERROR] 加载图片失败：{e}")
         return
     
     W, H = base_img.size
@@ -323,7 +318,7 @@ def draw_visual_on_original(
     # 保存图片
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
     new_canvas.save(save_path)
-    print(f"✅ 可视化图已保存：{save_path}")
+    print(f"[INFO] 可视化图已保存：{save_path}")
 
 # ====================== 4. 单文件处理函数（仅修改乱码处理部分，其余保留） ======================
 def process_single_image(img_path: Path, cfg: FusionConfig) -> bool:
@@ -346,14 +341,14 @@ def process_single_image(img_path: Path, cfg: FusionConfig) -> bool:
 
     # 2. 校验必要文件
     if not rule_json_path.exists():
-        print(f"❌ 跳过 {img_name}：规则JSON不存在 {rule_json_path}")
+        print(f"[ERROR] 跳过 {img_name}：规则JSON不存在 {rule_json_path}")
         return False
     
     # 3. 加载规则数据
     try:
         rule_data = load_json(rule_json_path)
     except Exception as e:
-        print(f"❌ 跳过 {img_name}：加载规则JSON失败 {e}")
+        print(f"[ERROR] 跳过 {img_name}：加载规则JSON失败 {e}")
         return False
     
     # 4. 加载模型数据（兼容不存在的情况）
@@ -375,7 +370,7 @@ def process_single_image(img_path: Path, cfg: FusionConfig) -> bool:
     try:
         ordered = build_ordered_list(rule_data["chars"], rule_data["segments_type_start_end"])
     except Exception as e:
-        print(f"❌ 跳过 {img_name}：构建有序列表失败 {e}")
+        print(f"[ERROR] 跳过 {img_name}：构建有序列表失败 {e}")
         return False
     
     merged = merge_chars(ordered, cfg, model_probs)
@@ -424,9 +419,27 @@ def process_single_image(img_path: Path, cfg: FusionConfig) -> bool:
         "chars": new_chars_list  # 仅保留非乱码字符
     }
 
-    # 9. 保存结果
+    # 9. 保存融合结果JSON
     save_json(result, output_json_path)
-    print(f"✅ 完成 {img_name}：结果已保存至 {output_json_path}")
+    
+    # 10. 同时生成 dataset/v2/ 格式数据
+    try:
+        from dataset.v2_manager import V2DataManager
+        v2_manager = V2DataManager()
+        
+        # 获取行图片路径（从规则数据中获取或从配置目录中查找）
+        line_img_path = rule_data.get("line_image_path")
+        if not line_img_path or not os.path.exists(line_img_path):
+            # 尝试从默认目录查找
+            line_img_path = str(cfg.IMAGE_DIR / img_name)
+        
+        if os.path.exists(line_img_path):
+            v2_manager.process_fusion_result(result, line_img_path)
+            print(f"   已同步至 dataset/v2/")
+    except Exception as e:
+        print(f"   [WARN] 同步至 dataset/v2/ 失败：{str(e)}")
+    
+    print(f"[INFO] 完成 {img_name}：结果已保存至 {output_json_path}")
     return True
 
 # ====================== 5. 批量处理主函数（完全保留） ======================
@@ -457,7 +470,7 @@ def batch_process(cfg: FusionConfig):
                 failed += 1
                 failed_list.append(img_path.name)
         except Exception as e:
-            print(f"❌ 处理 {img_path.name} 异常：{str(e)}")
+            print(f"[ERROR] 处理 {img_path.name} 异常：{str(e)}")
             failed += 1
             failed_list.append(img_path.name)
     

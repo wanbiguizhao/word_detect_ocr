@@ -76,8 +76,8 @@ def pdf_to_images_pymupdf(pdf_path):
 # ========== 运行示例 ==========
 if __name__ == "__main__":
     # 替换为你的PDF文件路径
-    PDF_FILE_PATH = "gwyb195521.pdf"
+    PDF_FILE_PATH = Path(__file__).resolve().parent /"gwyb195521.pdf"
     try:
-        pdf_to_images_pymupdf(PDF_FILE_PATH)
+        pdf_to_images_pymupdf(str(PDF_FILE_PATH.absolute()))
     except Exception as e:
         print(f"转换失败：{str(e)}")

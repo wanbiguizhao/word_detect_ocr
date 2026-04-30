@@ -109,7 +109,7 @@ class Preprocessor:
     def __init__(self, config: CharSegmentConfig):
         self.config = config
         self.save_dir = config.PREPROCESS_SAVE_DIR
-        ImageUtils.create_dir(self.save_dir)
+        #ImageUtils.create_dir(self.save_dir)
 
     def process(self, image_path: str):
         img = cv2.imread(image_path)

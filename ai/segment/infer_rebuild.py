@@ -35,7 +35,7 @@ class CharSegmentInfer:
         self.model = CharSegmentClassifier(config.PRETRAINED_AE_PATH).to(self.device)
         self.model.load_state_dict(torch.load(config.PRETRAINED_CHAR_SEGMENT_MODEL_PATH, map_location=self.device))
         self.model.eval()
-        print("✅ 模型加载成功！")
+        print("[INFO] 模型加载成功！")
 
         # 核心参数
         self.crop_width = CROP_WIDTH
@@ -214,7 +214,7 @@ class CharSegmentInfer:
         img_files = [f for f in folder.iterdir() if f.suffix.lower() in img_suffix]
 
         if not img_files:
-            print("❌ 未找到图片")
+            print("[ERROR] 未找到图片")
             return
 
         print(f"🚀 批量推理：{len(img_files)} 张图片")
@@ -222,8 +222,8 @@ class CharSegmentInfer:
             try:
                 self.infer_single_image(str(img_file), save_dir, save_vis)
             except Exception as e:
-                tqdm.write(f"❌ 处理失败 {img_file.name}: {str(e)}")
-        print(f"✅ 批量推理完成！")
+                tqdm.write(f"[ERROR] 处理失败 {img_file.name}: {str(e)}")
+        print("[INFO] 批量推理完成！")
 
     # ====================== 推理接口：单行测试（兼容旧代码） ======================
     def infer_whole_line(self, line_img_path: str, save_path: str = "result_line.png") -> List[Tuple[int, int]]:

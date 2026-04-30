@@ -169,4 +169,12 @@ dataset/*
 .ocr_venv
 server/backend/dataset/*
 server/frontend/.vscode 
-
+output/*
+pdf_images/*
+*filtered_char/*
+filtered_chars/*
+ai/word_recgonize/clusters_for_labeling
+ai/word_recgonize/hog_clusters_for_labeling
+ai/word_recgonize/semi_supervised_clusters
+*.pdf
+filtered_chars/*
