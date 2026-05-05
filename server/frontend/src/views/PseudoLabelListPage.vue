@@ -57,7 +57,7 @@ const goBack = () => {
 
 const clearAllCache = async () => {
   try {
-    await axios.delete('http://localhost:5000/api/pseudo-labels/cache')
+    await axios.delete('/api/pseudo-labels/cache')
     alert('缓存已清除')
   } catch (err) {
     console.error('清除缓存失败:', err)
@@ -66,7 +66,7 @@ const clearAllCache = async () => {
 
 const loadLabels = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/pseudo-labels')
+    const res = await axios.get('/api/pseudo-labels')
     if (res.data.code === 0) {
       labels.value = res.data.data || []
       if (res.data.stats) {

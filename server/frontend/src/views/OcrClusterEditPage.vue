@@ -68,7 +68,7 @@ const updateLabel = (index, event) => {
 
 const loadImages = async () => {
   try {
-    const response = await axios.get(`http://localhost:5000/api/clusters/${clusterId.value}/images`)
+    const response = await axios.get(`/api/clusters/${clusterId.value}/images`)
     images.value = response.data.images
     images.value.forEach(img => {
       originalLabels.value[img.index] = img.label
@@ -88,7 +88,7 @@ const saveChanges = async () => {
     }
     
     if (toSave.length > 0) {
-      await axios.post('http://localhost:5000/api/cluster-labels/batch-save', {
+      await axios.post('/api/cluster-labels/batch-save', {
         clusterId: parseInt(clusterId.value),
         labels: toSave
       })

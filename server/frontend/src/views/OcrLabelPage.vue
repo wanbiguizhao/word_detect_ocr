@@ -184,8 +184,8 @@ const calculateSuggestedChar = (chars) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const clustersRes = await axios.get('http://localhost:5000/api/clusters')
-    const labelsRes = await axios.get('http://localhost:5000/api/cluster-labels')
+    const clustersRes = await axios.get('/api/clusters')
+    const labelsRes = await axios.get('/api/cluster-labels')
 
     const clustersData = clustersRes.data.clusters || {}
     const labelsData = labelsRes.data.data || {}
@@ -268,7 +268,7 @@ const handleSort = () => {
 
 const saveAlias = async (record) => {
   try {
-    await axios.post('http://localhost:5000/api/cluster-labels/save', {
+    await axios.post('/api/cluster-labels/save', {
       clusterId: record.clusterId,
       alias: record.alias
     })
