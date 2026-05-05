@@ -1,0 +1,62 @@
+{
+  "image_name": "page_5.png_line_13.png",
+  "is_annotated": true,
+  "chars": [
+    {
+      "col_start": 183,
+      "col_end": 195,
+      "width": 12
+    },
+    {
+      "col_start": 202,
+      "col_end": 240,
+      "width": 38
+    },
+    {
+      "col_start": 245,
+      "col_end": 258,
+      "width": 13
+    },
+    {
+      "col_start": 290,
+      "col_end": 326,
+      "width": 36
+    },
+    {
+      "col_start": 330,
+      "col_end": 371,
+      "width": 41
+    },
+    {
+      "col_start": 376,
+      "col_end": 418,
+      "width": 42
+    },
+    {
+      "col_start": 421,
+      "col_end": 456,
+      "width": 35
+    },
+    {
+      "col_start": 467,
+      "col_end": 503,
+      "width": 36
+    },
+    {
+      "col_start": 509,
+      "col_end": 548,
+      "width": 39
+    },
+    {
+      "col_start": 554,
+      "col_end": 592,
+      "width": 38
+    },
+    {
+      "col_start": 597,
+      "col_end": 608,
+      "width": 11
+    }
+  ],
+  "updated_at": "2026-04-26T17:22:28.364050"
+}

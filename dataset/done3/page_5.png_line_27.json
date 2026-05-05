@@ -1,0 +1,38 @@
+{
+  "image_name": "page_5.png_line_27.png",
+  "is_annotated": true,
+  "is_postponed": false,
+  "chars": [
+    {
+      "col_start": 1566,
+      "col_end": 1576,
+      "width": 10
+    },
+    {
+      "col_start": 1601,
+      "col_end": 1620,
+      "width": 19
+    },
+    {
+      "col_start": 1622,
+      "col_end": 1646,
+      "width": 24
+    },
+    {
+      "col_start": 1648,
+      "col_end": 1670,
+      "width": 22
+    },
+    {
+      "col_start": 1673,
+      "col_end": 1694,
+      "width": 21
+    },
+    {
+      "col_start": 1720,
+      "col_end": 1730,
+      "width": 10
+    }
+  ],
+  "updated_at": "2026-04-26T21:36:46.821243"
+}

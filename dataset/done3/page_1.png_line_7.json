@@ -1,0 +1,257 @@
+{
+  "image_name": "page_1.png_line_7.png",
+  "is_annotated": true,
+  "chars": [
+    {
+      "col_start": 255,
+      "col_end": 293,
+      "width": 38
+    },
+    {
+      "col_start": 299,
+      "col_end": 307,
+      "width": 8
+    },
+    {
+      "col_start": 339,
+      "col_end": 378,
+      "width": 39
+    },
+    {
+      "col_start": 385,
+      "col_end": 422,
+      "width": 37
+    },
+    {
+      "col_start": 426,
+      "col_end": 463,
+      "width": 37
+    },
+    {
+      "col_start": 469,
+      "col_end": 510,
+      "width": 41
+    },
+    {
+      "col_start": 513,
+      "col_end": 552,
+      "width": 39
+    },
+    {
+      "col_start": 558,
+      "col_end": 596,
+      "width": 38
+    },
+    {
+      "col_start": 603,
+      "col_end": 641,
+      "width": 38
+    },
+    {
+      "col_start": 645,
+      "col_end": 685,
+      "width": 40
+    },
+    {
+      "col_start": 688,
+      "col_end": 727,
+      "width": 39
+    },
+    {
+      "col_start": 735,
+      "col_end": 746,
+      "width": 11
+    },
+    {
+      "col_start": 774,
+      "col_end": 811,
+      "width": 37
+    },
+    {
+      "col_start": 818,
+      "col_end": 855,
+      "width": 37
+    },
+    {
+      "col_start": 861,
+      "col_end": 899,
+      "width": 38
+    },
+    {
+      "col_start": 902,
+      "col_end": 941,
+      "width": 39
+    },
+    {
+      "col_start": 946,
+      "col_end": 985,
+      "width": 39
+    },
+    {
+      "col_start": 989,
+      "col_end": 1025,
+      "width": 36
+    },
+    {
+      "col_start": 1030,
+      "col_end": 1071,
+      "width": 41
+    },
+    {
+      "col_start": 1075,
+      "col_end": 1114,
+      "width": 39
+    },
+    {
+      "col_start": 1119,
+      "col_end": 1133,
+      "width": 14
+    },
+    {
+      "col_start": 1162,
+      "col_end": 1198,
+      "width": 36
+    },
+    {
+      "col_start": 1204,
+      "col_end": 1241,
+      "width": 37
+    },
+    {
+      "col_start": 1245,
+      "col_end": 1284,
+      "width": 39
+    },
+    {
+      "col_start": 1292,
+      "col_end": 1298,
+      "width": 6
+    },
+    {
+      "col_start": 1307,
+      "col_end": 1312,
+      "width": 5
+    },
+    {
+      "col_start": 1321,
+      "col_end": 1327,
+      "width": 6
+    },
+    {
+      "col_start": 1335,
+      "col_end": 1341,
+      "width": 6
+    },
+    {
+      "col_start": 1350,
+      "col_end": 1355,
+      "width": 5
+    },
+    {
+      "col_start": 1364,
+      "col_end": 1370,
+      "width": 6
+    },
+    {
+      "col_start": 1379,
+      "col_end": 1385,
+      "width": 6
+    },
+    {
+      "col_start": 1393,
+      "col_end": 1399,
+      "width": 6
+    },
+    {
+      "col_start": 1408,
+      "col_end": 1413,
+      "width": 5
+    },
+    {
+      "col_start": 1421,
+      "col_end": 1427,
+      "width": 6
+    },
+    {
+      "col_start": 1435,
+      "col_end": 1441,
+      "width": 6
+    },
+    {
+      "col_start": 1450,
+      "col_end": 1455,
+      "width": 5
+    },
+    {
+      "col_start": 1464,
+      "col_end": 1470,
+      "width": 6
+    },
+    {
+      "col_start": 1478,
+      "col_end": 1484,
+      "width": 6
+    },
+    {
+      "col_start": 1493,
+      "col_end": 1498,
+      "width": 5
+    },
+    {
+      "col_start": 1506,
+      "col_end": 1513,
+      "width": 7
+    },
+    {
+      "col_start": 1521,
+      "col_end": 1527,
+      "width": 6
+    },
+    {
+      "col_start": 1536,
+      "col_end": 1542,
+      "width": 6
+    },
+    {
+      "col_start": 1549,
+      "col_end": 1555,
+      "width": 6
+    },
+    {
+      "col_start": 1564,
+      "col_end": 1570,
+      "width": 6
+    },
+    {
+      "col_start": 1578,
+      "col_end": 1584,
+      "width": 6
+    },
+    {
+      "col_start": 1613,
+      "col_end": 1626,
+      "width": 13
+    },
+    {
+      "col_start": 1634,
+      "col_end": 1649,
+      "width": 15
+    },
+    {
+      "col_start": 1653,
+      "col_end": 1695,
+      "width": 42
+    },
+    {
+      "col_start": 1698,
+      "col_end": 1713,
+      "width": 15
+    },
+    {
+      "col_start": 1720,
+      "col_end": 1733,
+      "width": 13
+    }
+  ],
+  "updated_at": "2026-04-26T17:26:17.706775"
+}

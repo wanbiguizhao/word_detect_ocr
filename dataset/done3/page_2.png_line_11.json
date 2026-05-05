@@ -1,0 +1,372 @@
+{
+  "image_name": "page_2.png_line_11.png",
+  "is_annotated": true,
+  "chars": [
+    {
+      "col_start": 284,
+      "col_end": 322,
+      "width": 38
+    },
+    {
+      "col_start": 353,
+      "col_end": 366,
+      "width": 13
+    },
+    {
+      "col_start": 372,
+      "col_end": 411,
+      "width": 39
+    },
+    {
+      "col_start": 415,
+      "col_end": 455,
+      "width": 40
+    },
+    {
+      "col_start": 459,
+      "col_end": 499,
+      "width": 40
+    },
+    {
+      "col_start": 503,
+      "col_end": 541,
+      "width": 38
+    },
+    {
+      "col_start": 545,
+      "col_end": 585,
+      "width": 40
+    },
+    {
+      "col_start": 591,
+      "col_end": 603,
+      "width": 12
+    },
+    {
+      "col_start": 632,
+      "col_end": 671,
+      "width": 39
+    },
+    {
+      "col_start": 676,
+      "col_end": 713,
+      "width": 37
+    },
+    {
+      "col_start": 720,
+      "col_end": 756,
+      "width": 36
+    },
+    {
+      "col_start": 762,
+      "col_end": 799,
+      "width": 37
+    },
+    {
+      "col_start": 807,
+      "col_end": 844,
+      "width": 37
+    },
+    {
+      "col_start": 855,
+      "col_end": 860,
+      "width": 5
+    },
+    {
+      "col_start": 869,
+      "col_end": 874,
+      "width": 5
+    },
+    {
+      "col_start": 883,
+      "col_end": 888,
+      "width": 5
+    },
+    {
+      "col_start": 897,
+      "col_end": 902,
+      "width": 5
+    },
+    {
+      "col_start": 912,
+      "col_end": 917,
+      "width": 5
+    },
+    {
+      "col_start": 925,
+      "col_end": 930,
+      "width": 5
+    },
+    {
+      "col_start": 937,
+      "col_end": 943,
+      "width": 6
+    },
+    {
+      "col_start": 952,
+      "col_end": 957,
+      "width": 5
+    },
+    {
+      "col_start": 966,
+      "col_end": 971,
+      "width": 5
+    },
+    {
+      "col_start": 979,
+      "col_end": 985,
+      "width": 6
+    },
+    {
+      "col_start": 994,
+      "col_end": 999,
+      "width": 5
+    },
+    {
+      "col_start": 1008,
+      "col_end": 1012,
+      "width": 4
+    },
+    {
+      "col_start": 1022,
+      "col_end": 1028,
+      "width": 6
+    },
+    {
+      "col_start": 1037,
+      "col_end": 1042,
+      "width": 5
+    },
+    {
+      "col_start": 1051,
+      "col_end": 1057,
+      "width": 6
+    },
+    {
+      "col_start": 1065,
+      "col_end": 1069,
+      "width": 4
+    },
+    {
+      "col_start": 1079,
+      "col_end": 1084,
+      "width": 5
+    },
+    {
+      "col_start": 1093,
+      "col_end": 1099,
+      "width": 6
+    },
+    {
+      "col_start": 1108,
+      "col_end": 1113,
+      "width": 5
+    },
+    {
+      "col_start": 1122,
+      "col_end": 1127,
+      "width": 5
+    },
+    {
+      "col_start": 1136,
+      "col_end": 1141,
+      "width": 5
+    },
+    {
+      "col_start": 1151,
+      "col_end": 1156,
+      "width": 5
+    },
+    {
+      "col_start": 1165,
+      "col_end": 1170,
+      "width": 5
+    },
+    {
+      "col_start": 1180,
+      "col_end": 1185,
+      "width": 5
+    },
+    {
+      "col_start": 1193,
+      "col_end": 1199,
+      "width": 6
+    },
+    {
+      "col_start": 1208,
+      "col_end": 1213,
+      "width": 5
+    },
+    {
+      "col_start": 1222,
+      "col_end": 1228,
+      "width": 6
+    },
+    {
+      "col_start": 1237,
+      "col_end": 1242,
+      "width": 5
+    },
+    {
+      "col_start": 1251,
+      "col_end": 1256,
+      "width": 5
+    },
+    {
+      "col_start": 1265,
+      "col_end": 1271,
+      "width": 6
+    },
+    {
+      "col_start": 1279,
+      "col_end": 1284,
+      "width": 5
+    },
+    {
+      "col_start": 1294,
+      "col_end": 1299,
+      "width": 5
+    },
+    {
+      "col_start": 1308,
+      "col_end": 1313,
+      "width": 5
+    },
+    {
+      "col_start": 1322,
+      "col_end": 1327,
+      "width": 5
+    },
+    {
+      "col_start": 1336,
+      "col_end": 1341,
+      "width": 5
+    },
+    {
+      "col_start": 1351,
+      "col_end": 1356,
+      "width": 5
+    },
+    {
+      "col_start": 1365,
+      "col_end": 1370,
+      "width": 5
+    },
+    {
+      "col_start": 1380,
+      "col_end": 1385,
+      "width": 5
+    },
+    {
+      "col_start": 1394,
+      "col_end": 1399,
+      "width": 5
+    },
+    {
+      "col_start": 1408,
+      "col_end": 1413,
+      "width": 5
+    },
+    {
+      "col_start": 1422,
+      "col_end": 1427,
+      "width": 5
+    },
+    {
+      "col_start": 1437,
+      "col_end": 1442,
+      "width": 5
+    },
+    {
+      "col_start": 1451,
+      "col_end": 1456,
+      "width": 5
+    },
+    {
+      "col_start": 1465,
+      "col_end": 1471,
+      "width": 6
+    },
+    {
+      "col_start": 1480,
+      "col_end": 1485,
+      "width": 5
+    },
+    {
+      "col_start": 1494,
+      "col_end": 1499,
+      "width": 5
+    },
+    {
+      "col_start": 1508,
+      "col_end": 1514,
+      "width": 6
+    },
+    {
+      "col_start": 1523,
+      "col_end": 1528,
+      "width": 5
+    },
+    {
+      "col_start": 1537,
+      "col_end": 1542,
+      "width": 5
+    },
+    {
+      "col_start": 1552,
+      "col_end": 1557,
+      "width": 5
+    },
+    {
+      "col_start": 1566,
+      "col_end": 1571,
+      "width": 5
+    },
+    {
+      "col_start": 1580,
+      "col_end": 1585,
+      "width": 5
+    },
+    {
+      "col_start": 1594,
+      "col_end": 1600,
+      "width": 6
+    },
+    {
+      "col_start": 1608,
+      "col_end": 1615,
+      "width": 7
+    },
+    {
+      "col_start": 1645,
+      "col_end": 1658,
+      "width": 13
+    },
+    {
+      "col_start": 1666,
+      "col_end": 1681,
+      "width": 15
+    },
+    {
+      "col_start": 1686,
+      "col_end": 1706,
+      "width": 20
+    },
+    {
+      "col_start": 1708,
+      "col_end": 1726,
+      "width": 18
+    },
+    {
+      "col_start": 1732,
+      "col_end": 1748,
+      "width": 16
+    },
+    {
+      "col_start": 1754,
+      "col_end": 1767,
+      "width": 13
+    }
+  ],
+  "updated_at": "2026-04-26T16:27:31.780949"
+}

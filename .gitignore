@@ -162,6 +162,7 @@ ai/segment/temp
 dataset/*
 !dataset/done
 !dataset/done2
+!dataset/done3
 !dataset/*.md
 !dataset/*.py
 *.pth
