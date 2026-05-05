@@ -259,17 +259,17 @@ const selectionBoxStyle = computed(() => {
 })
 
 const getImageUrl = (charId) => {
-  return `http://localhost:5000/api/char-images/${charId}.png`
+  return `/api/char-images/${charId}.png`
 }
 
 const showLineContext = async (img) => {
-  if (!img.lineage || !img.lineage.line_path) {
+  if (!img.lineage || !img.lineage.line_name) {
     alert('无法获取行信息')
     return
   }
 
-  const linePath = img.lineage.line_path.replace(/\\/g, '/')
-  const lineUrl = `http://localhost:5000/api/line-images/${encodeURIComponent(linePath)}`
+  const lineName = img.lineage.line_name
+  const lineUrl = `/api/line-images/${encodeURIComponent(lineName)}`
 
   const colStart = img.lineage.col_start || 0
   const charWidth = img.lineage.width || 40
@@ -301,10 +301,10 @@ const showLineContext = async (img) => {
 
 const loadData = async () => {
   try {
-    const res = await axios.get(`http://localhost:5000/api/clusters/${clusterId.value}/images`)
+    const res = await axios.get(`/api/clusters/${clusterId.value}/images`)
     images.value = res.data.images || []
 
-    const labelsRes = await axios.get('http://localhost:5000/api/cluster-labels')
+    const labelsRes = await axios.get('/api/cluster-labels')
     const clusterLabel = labelsRes.data.data?.[clusterId.value] || {}
     alias.value = clusterLabel.alias || ''
 
@@ -328,7 +328,7 @@ const loadData = async () => {
 
 const loadRecommendations = async () => {
   try {
-    const res = await axios.get(`http://localhost:5000/api/clusters/${clusterId.value}/recommend?mode=${recommendMode.value}`)
+    const res = await axios.get(`/api/clusters/${clusterId.value}/recommend?mode=${recommendMode.value}`)
     if (res.data.code === 0 && res.data.recommendations) {
       recommendations.value = Object.entries(res.data.recommendations).map(([char, info]) => ({
         char,
@@ -348,7 +348,7 @@ const selectRecommendChar = async (char) => {
   selectedRecommendChar.value = char
   selectedRecommendIndices.value = []
   try {
-    const res = await axios.get(`http://localhost:5000/api/clusters/${clusterId.value}/recommend/${char}`)
+    const res = await axios.get(`/api/clusters/${clusterId.value}/recommend/${char}`)
     if (res.data.code === 0) {
       recommendImages.value = res.data.images || []
     }
@@ -462,7 +462,7 @@ const applyRecommendLabel = async () => {
       pendingLabels.value[idx] = selectedRecommendChar.value
     }
 
-    const response = await axios.post('http://localhost:5000/api/cluster-labels/batch-save', {
+    const response = await axios.post('/api/cluster-labels/batch-save', {
       clusterId: parseInt(clusterId.value),
       labels: selectedRecommendIndices.value.map(idx => ({
         char: selectedRecommendChar.value,
@@ -492,7 +492,7 @@ const skipCluster = async () => {
 
   skipping.value = true
   try {
-    await axios.post(`http://localhost:5000/api/clusters/${clusterId.value}/skip`)
+    await axios.post(`/api/clusters/${clusterId.value}/skip`)
     alert('已标记为暂不标记')
     router.push('/ocr')
   } catch (err) {
@@ -519,7 +519,7 @@ const saveLabel = async (img) => {
 
 const saveAlias = async () => {
   try {
-    await axios.post('http://localhost:5000/api/cluster-labels/save', {
+    await axios.post('/api/cluster-labels/save', {
       clusterId: parseInt(clusterId.value),
       alias: alias.value
     })
@@ -640,7 +640,7 @@ const saveAll = async () => {
       return
     }
 
-    const response = await axios.post('http://localhost:5000/api/cluster-labels/batch-save', {
+    const response = await axios.post('/api/cluster-labels/batch-save', {
       clusterId: parseInt(clusterId.value),
       labels: toSave.map(item => ({ char: item.char, charIndex: item.index }))
     })

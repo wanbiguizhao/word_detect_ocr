@@ -128,7 +128,7 @@ const editCluster = (clusterId) => {
 
 const clearCache = async () => {
   try {
-    await axios.delete(`http://localhost:5000/api/pseudo-labels/cache/${encodeURIComponent(char)}`)
+    await axios.delete(`/api/pseudo-labels/cache/${encodeURIComponent(char)}`)
     loadClusters()
   } catch (err) {
     console.error('清除缓存失败:', err)
@@ -138,7 +138,7 @@ const clearCache = async () => {
 const loadClusters = async () => {
   loading.value = true
   try {
-    const res = await axios.post('http://localhost:5000/api/pseudo-labels/clusters', { char: char })
+    const res = await axios.post('/api/pseudo-labels/clusters', { char: char })
     if (res.data.code === 0) {
       clusters.value = res.data.clusters || []
     }
@@ -151,7 +151,7 @@ const loadClusters = async () => {
 
 const loadClusterImages = async (clusterId) => {
   try {
-    const res = await axios.post('http://localhost:5000/api/pseudo-labels/clusters/images', { 
+    const res = await axios.post('/api/pseudo-labels/clusters/images', { 
       char: char, 
       cluster_id: clusterId 
     })
@@ -166,7 +166,7 @@ const loadClusterImages = async (clusterId) => {
 }
 
 const getImageUrl = (charId) => {
-  return `http://localhost:5000/api/char-images/${charId}.png`
+  return `/api/char-images/${charId}.png`
 }
 
 const toggleSelect = (index) => {
@@ -190,7 +190,7 @@ const batchLabel = async () => {
   if (selectedImages.value.length === 0) return
 
   try {
-    await axios.post('http://localhost:5000/api/cluster-labels/batch-save', {
+    await axios.post('/api/cluster-labels/batch-save', {
       clusterId: expandedCluster.value,
       labels: selectedImages.value.map(idx => ({
         char: char,

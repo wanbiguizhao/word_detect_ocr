@@ -112,7 +112,7 @@ const loadList = async () => {
       is_annotated: filterAnnotated.value === "all" ? null : filterAnnotated.value
     }
     const res = await axios({
-      url: "http://localhost:5000/api/images",
+      url: "/api/images",
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: sendParams
