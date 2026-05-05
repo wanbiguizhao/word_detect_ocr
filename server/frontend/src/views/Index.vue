@@ -97,18 +97,14 @@ const handleSelectChange = (selectedValue) => {
 
 // 分页切换事件
 const handlePageChange = (page) => {
-  console.log('分页切换事件:', page)
   pagination.value.current = page.current
   pagination.value.pageSize = page.pageSize
-  console.log('更新后分页配置:', pagination.value)
-  console.log('计算后当前页数据:', paginatedList.value)
   // 前端分页，不需要重新请求数据
 }
 
 // 监听localStorage变化，实现跨页面通信
 const handleStorageChange = (e) => {
   if (e.key === 'annotationUpdated') {
-    console.log('收到标注更新通知，刷新数据')
     loadList()
   }
 }
@@ -122,24 +118,18 @@ const formatTime = (isoTime) => {
 // 请求列表数据（一次性获取所有数据）
 const loadList = async () => {
   try {
-    console.log('开始加载数据，筛选条件:', filterAnnotated.value)
     const sendParams = {
       is_annotated: filterAnnotated.value === "all" ? null : filterAnnotated.value
       // 移除分页参数，一次性获取所有数据
     }
-    console.log('发送参数:', sendParams)
     const res = await axios({
       url: "http://localhost:5000/api/images",
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: sendParams
     })
-    console.log('响应数据:', res.data)
     allData.value = res.data.data
-    console.log('加载数据长度:', allData.value.length)
     pagination.value.total = res.data.total || allData.value.length
-    console.log('更新分页total:', pagination.value.total)
-    console.log('当前分页配置:', pagination.value)
   } catch (err) {
     console.error("请求失败：", err)
   }
