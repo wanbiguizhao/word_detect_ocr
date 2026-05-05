@@ -20,7 +20,7 @@
         <h3>行图片</h3>
         <div class="image-container">
           <img 
-            :src="`http://localhost:5000/api/line-images/${lineName}`" 
+            :src="`/api/line-images/${lineName}`" 
             :alt="lineName"
             class="line-image"
             @error="handleImageError"
@@ -62,7 +62,7 @@ const lineData = ref(null)
 
 const loadLineData = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/line-status')
+    const response = await fetch('/api/line-status')
     const result = await response.json()
     if (result.code === 0) {
       lineData.value = result.data.find(l => l.line_name === lineName.value)

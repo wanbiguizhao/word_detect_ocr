@@ -75,7 +75,7 @@ const filteredLines = computed(() => {
 
 const loadLines = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/line-status')
+    const response = await fetch('/api/line-status')
     const result = await response.json()
     if (result.code === 0) {
       lines.value = result.data

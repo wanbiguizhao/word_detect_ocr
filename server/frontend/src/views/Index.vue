@@ -123,7 +123,7 @@ const loadList = async () => {
       // 移除分页参数，一次性获取所有数据
     }
     const res = await axios({
-      url: "http://localhost:5000/api/images",
+      url: "/api/images",
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: sendParams

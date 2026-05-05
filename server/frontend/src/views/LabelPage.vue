@@ -135,7 +135,7 @@ const route = useRoute()
 const router = useRouter()
 const imageId = route.params.id
 
-const imgUrl = `http://localhost:5000/api/images/${imageId}/raw`
+const imgUrl = `/api/images/${imageId}/raw`
 
 // 加载状态
 const loading = ref(true)
@@ -244,7 +244,7 @@ const clearAllLines = () => {
 // 保存
 const save = async () => {
   try {
-    await axios.post(`http://localhost:5000/api/images/${imageId}/annotate`, { lines: editLines.value })
+    await axios.post(`/api/images/${imageId}/annotate`, { lines: editLines.value })
     alert('保存成功！')
     // 更新localStorage，通知主页面刷新
     localStorage.setItem('annotationUpdated', Date.now().toString())
@@ -257,7 +257,7 @@ const save = async () => {
 // 暂不标注
 const postpone = async () => {
   try {
-    await axios.post(`http://localhost:5000/api/images/${imageId}/postpone`)
+    await axios.post(`/api/images/${imageId}/postpone`)
     alert('已标记为暂不标注！')
     // 更新localStorage，通知主页面刷新
     localStorage.setItem('annotationUpdated', Date.now().toString())
@@ -271,7 +271,7 @@ const postpone = async () => {
 const loadDetail = async () => {
   try {
     loading.value = true
-    const res = await axios.get(`http://localhost:5000/api/images/${imageId}/detail`)
+    const res = await axios.get(`/api/images/${imageId}/detail`)
     const data = res.data.data
     isAnnotated.value = data.is_annotated || false
     isPostponed.value = data.is_postponed || false

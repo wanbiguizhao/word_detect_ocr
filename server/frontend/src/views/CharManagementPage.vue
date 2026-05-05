@@ -78,7 +78,7 @@
                       class="image-item"
                       @click="goToCluster(img.cluster_id)"
                     >
-                      <img :src="`http://localhost:5000/api/char-images/${img.filename}`" :alt="selectedChar" />
+                      <img :src="`/api/char-images/${img.filename}`" :alt="selectedChar" />
                       <span class="image-info">{{ img.filename }}</span>
                       <span class="cluster-tag">聚类 {{ img.cluster_id }}</span>
                     </div>
@@ -224,7 +224,7 @@ const filteredChars = computed(() => {
 
 const loadData = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/pseudo-labels')
+    const res = await axios.get('/api/pseudo-labels')
     if (res.data.code === 0) {
       chars.value = res.data.data
     }
@@ -244,7 +244,7 @@ const selectChar = async (char) => {
   recommendClusters.value = []
   
   try {
-    const res = await axios.get(`http://localhost:5000/api/char-images/list?char=${encodeURIComponent(char)}`)
+    const res = await axios.get(`/api/char-images/search?char=${encodeURIComponent(char)}`)
     if (res.data.code === 0) {
       charImages.value = res.data.images || []
     } else {
@@ -265,7 +265,7 @@ const computePseudoLabels = async () => {
   showRecommendResult.value = false
   
   try {
-    const res = await axios.post('http://localhost:5000/api/pseudo-labels/clusters', {
+    const res = await axios.post('/api/pseudo-labels/clusters', {
       char: selectedChar.value
     })
     
