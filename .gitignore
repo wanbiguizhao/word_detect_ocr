@@ -178,3 +178,6 @@ ai/word_recgonize/hog_clusters_for_labeling
 ai/word_recgonize/semi_supervised_clusters
 *.pdf
 filtered_chars/*
+*datahome/*
+bussiness/datahome
+ocr_system/data
