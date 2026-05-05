@@ -25,8 +25,8 @@ class Line2CharConfig:
     model_target_height: int = 55  # 模型目标高度：单字切割框高度
     
     # ===== 模型路径配置 =====
-    model_ae_path: str = "ai/model_storage/feature_model.pth"  # 预训练自编码器权重路径
-    model_segment_path: str = "ai/model_storage/char_segment_classifier_0427.pth"  # 预训练分割模型权重路径
+    model_ae_path: str = ""  # 预训练自编码器权重路径（使用时必须设置）
+    model_segment_path: str = ""  # 预训练分割模型权重路径（使用时必须设置）
     model_device: str = "auto"  # 运行设备：auto=自动选择, cuda, cpu
 
     # ===== 融合执行参数 =====

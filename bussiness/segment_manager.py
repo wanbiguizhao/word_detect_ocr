@@ -616,26 +616,20 @@ class ClusterManager:
     负责对segment_manager生成的汉字图片进行HOG聚类
     """
     
-    def __init__(self, input_dir: str = None, output_dir: str = None, n_clusters: int = 50, lineage_file: str = None):
+    def __init__(self, input_dir: str, output_dir: str, n_clusters: int = 50, lineage_file: str = None):
         """
         初始化聚类管理器
         
         Args:
-            input_dir: 汉字图片输入目录
-            output_dir: 聚类结果输出目录
-            n_clusters: 聚类数量
+            input_dir: 汉字图片输入目录（必需）
+            output_dir: 聚类结果输出目录（必需）
+            n_clusters: 聚类数量，默认50
             lineage_file: 血缘关系文件路径（可选，用于关联聚类结果）
         """
-        base_dir = Path(__file__).resolve().parent.parent
-        
-        self.input_dir = Path(input_dir) if input_dir else base_dir / "bussiness/datahome/pdf01/pdf_chars"
-        self.output_dir = Path(output_dir) if output_dir else base_dir / "bussiness/datahome/pdf01/clusters"
+        self.input_dir = Path(input_dir)
+        self.output_dir = Path(output_dir)
         self.n_clusters = n_clusters
-        
-        if lineage_file:
-            self.lineage_file = Path(lineage_file)
-        else:
-            self.lineage_file = base_dir / "bussiness/datahome/pdf01/lineage.json"
+        self.lineage_file = Path(lineage_file) if lineage_file else None
         
         self.clusters = {}
         self.char_to_cluster = {}
@@ -646,19 +640,41 @@ class ClusterManager:
     def _load_lineage(self) -> None:
         """
         加载血缘关系数据
+        
+        血缘关系文件包含汉字与原始PDF页面、行的对应关系，用于聚类结果的溯源分析。
+        若未提供血缘文件路径，则跳过加载。
         """
         import json
         
-        if self.lineage_file and self.lineage_file.exists():
+        if not self.lineage_file:
+            print(f"[INFO] 未指定血缘文件路径，跳过血缘关系加载")
+            self.lineage_data = {}
+            return
+        
+        print(f"[INFO] 尝试加载血缘关系文件: {self.lineage_file}")
+        
+        if self.lineage_file.exists():
             try:
                 with open(self.lineage_file, 'r', encoding='utf-8') as f:
                     self.lineage_data = json.load(f)
-                print(f"[INFO] 已加载血缘关系: {len(self.lineage_data.get('chars', {}))} 个汉字")
+                
+                chars_count = len(self.lineage_data.get('chars', {}))
+                pages_count = len(self.lineage_data.get('pages', {}))
+                lines_count = len(self.lineage_data.get('lines', {}))
+                
+                print(f"[INFO] 血缘关系加载成功:")
+                print(f"       - 文件路径: {self.lineage_file}")
+                print(f"       - 汉字数量: {chars_count}")
+                print(f"       - 页面数量: {pages_count}")
+                print(f"       - 行数量: {lines_count}")
+                
             except Exception as e:
-                print(f"[WARN] 无法加载血缘文件: {str(e)}")
+                print(f"[ERROR] 加载血缘文件失败: {self.lineage_file}")
+                print(f"       错误信息: {str(e)}")
                 self.lineage_data = {}
         else:
             print(f"[WARN] 血缘文件不存在: {self.lineage_file}")
+            print(f"       将跳过血缘关系关联")
             self.lineage_data = {}
     
     def _get_char_lineage(self, char_id: str) -> Dict:
@@ -884,32 +900,80 @@ class ClusterManager:
         
         return result
 
-def run_segment(base_dir):
-    data_base_path = base_dir / "bussiness"/"datahome"/ "pdf01"
-    pdf_path = data_base_path / "gwyb195521.pdf"
+def run_segment(data_base_path, pdf_path):
+    """
+    运行PDF文本分割流程
+    
+    Args:
+        data_base_path (Path): 数据基础目录，用于存放输出文件
+        pdf_path (Path): PDF文件路径
+    
+    Returns:
+        None
+        
+    输出目录结构（相对于 data_base_path）:
+        pdf_images/       - PDF转换后的页面图片
+        pdf_lines/        - 切割后的行图片
+        pdf_chars/        - 切割后的汉字图片
+        rule_infer/       - 规则切割结果JSON
+        model_infer/      - 模型切割结果JSON
+        fusion/           - 融合结果
+            fusion_json/  - 融合结果JSON
+            fusion_visual/ - 融合可视化图片
+        lineage.json      - 血缘关系文件
+    
+    注意：每个PDF文件夹应有独立的 data_base_path，避免不同PDF处理结果互相覆盖。
+    """
+    # 获取项目根目录（用于定位模型文件）
+    project_root = Path(__file__).resolve().parent.parent
+    
+    # PDF转图片配置
     pdf_cfg = Pdf2ImageConfig()
-    pdf_cfg.output_dir = data_base_path /"pdf_images"
+    pdf_cfg.output_dir = data_base_path / "pdf_images"
     
+    # 图片转行配置
     img_cfg = Image2LineConfig()
-    img_cfg.output_dir = data_base_path /"pdf_lines"
+    img_cfg.output_dir = data_base_path / "pdf_lines"
     
+    # 行转汉字配置
     char_cfg = Line2CharConfig()
     char_cfg.max_line_height = 50 
     char_cfg.min_line_height = 40 
-    char_cfg.output_dir = data_base_path /"pdf_chars"
-    char_cfg.rule_json_dir = data_base_path /"rule_infer"
-    char_cfg.model_json_dir = data_base_path /"model_infer"
-    char_cfg.output_json_dir = data_base_path /"fusion"/ "fusion_json"
-    char_cfg.output_img_dir = data_base_path /"fusion" / "fusion_visual"
+    char_cfg.output_dir = data_base_path / "pdf_chars"
+    char_cfg.rule_json_dir = data_base_path / "rule_infer"
+    char_cfg.model_json_dir = data_base_path / "model_infer"
+    char_cfg.output_json_dir = data_base_path / "fusion" / "fusion_json"
+    char_cfg.output_img_dir = data_base_path / "fusion" / "fusion_visual"
     
+    # 设置模型路径（从项目根目录定位）
+    char_cfg.model_ae_path = str(project_root / "ai/model_storage/feature_model.pth")
+    char_cfg.model_segment_path = str(project_root / "ai/model_storage/char_segment_classifier_0427.pth")
     
-    segment_manager = SegmentManager(pdf_cfg=pdf_cfg,img_cfg=img_cfg,char_cfg=char_cfg)
+    # 验证配置
+    char_cfg.validate()
+    
+    # 创建所有输出目录
+    os.makedirs(pdf_cfg.output_dir, exist_ok=True)
+    os.makedirs(img_cfg.output_dir, exist_ok=True)
+    os.makedirs(char_cfg.output_dir, exist_ok=True)
+    os.makedirs(char_cfg.rule_json_dir, exist_ok=True)
+    os.makedirs(char_cfg.model_json_dir, exist_ok=True)
+    os.makedirs(char_cfg.output_json_dir, exist_ok=True)
+    os.makedirs(char_cfg.output_img_dir, exist_ok=True)
+    
+    print(f"[INFO] 数据基础目录: {data_base_path}")
+    print(f"[INFO] PDF文件: {pdf_path}")
+    print(f"[INFO] 输出目录已准备就绪")
+    
+    # 执行分割
+    segment_manager = SegmentManager(pdf_cfg=pdf_cfg, img_cfg=img_cfg, char_cfg=char_cfg)
     segment_manager.process_pdf(str(pdf_path))    
 if __name__ == "__main__":
 
     base_dir = Path(__file__).resolve().parent.parent
-    data_base_path = base_dir / "bussiness"/"datahome"/ "pdf01"
-    run_segment(base_dir)
+    data_base_path = base_dir / "bussiness"/"datahome"/ "pdf5823"
+    pdf_path = data_base_path / "gwyb195823.pdf"
+    run_segment(data_base_path, pdf_path)
     print("\n" + "=" * 60)
     print("开始聚类")
     print("=" * 60)
@@ -917,7 +981,7 @@ if __name__ == "__main__":
     cluster_manager = ClusterManager(
         input_dir=data_base_path / "pdf_chars",
         output_dir=data_base_path / "clusters",
-        n_clusters=50
+        n_clusters=1000
     )
     cluster_manager.run()
     
