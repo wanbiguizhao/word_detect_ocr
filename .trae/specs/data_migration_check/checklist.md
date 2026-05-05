@@ -1,0 +1,7 @@
+- [x] Checkpoint 1: 所有前端Vue组件中不存在硬编码的数据集路径（如/pdf01/）
+- [x] Checkpoint 2: 所有axios调用都包含dataset参数（通过axios拦截器自动添加）
+- [x] Checkpoint 3: 各数据集文件夹结构完整（clusters、labeling、pdf_chars、pdf_lines）
+- [x] Checkpoint 4: labels.json文件存在于对应数据集目录
+- [x] Checkpoint 5: 首页数据集选择器正常工作，localStorage正确保存
+- [x] Checkpoint 6: 标注页面正确接收并使用dataset参数（通过依赖注入）
+- [x] Checkpoint 7: 数据集切换后显示对应数据集的数据

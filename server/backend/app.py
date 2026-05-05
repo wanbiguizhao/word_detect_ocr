@@ -10,6 +10,25 @@ from pydantic import BaseModel
 from typing import List, Optional
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
+import asyncio
+
+# ======================================
+# 从 config.py 导入配置
+# ======================================
+from config import (
+    DATASET_ID,
+    DATASET_DIR,
+    RAW_IMAGES_DIR,
+    RULE_JSONS_DIR,
+    MODEL_JSONS_DIR,
+    FUSION_JSONS_DIR,
+    ANNOTATIONS_DIR,
+    TOP_SAMPLES_PATH,
+    CLUSTERS_JSON,
+    LABELS_JSON,
+    pseudo_label_cache,
+    executor
+)
 
 # ======================================
 # 应用初始化
@@ -30,29 +49,6 @@ async def set_encoding(request: Request, call_next):
     response = await call_next(request)
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
-
-pseudo_label_cache = {}
-
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
-
-executor = ThreadPoolExecutor(max_workers=4)
-
-# ======================================
-# 路径配置
-# ======================================
-BASE_DIR = Path(__file__).parent
-DATASET_DIR = BASE_DIR / "dataset"
-
-RAW_IMAGES_DIR = DATASET_DIR / "raw_images"
-RULE_JSONS_DIR = DATASET_DIR / "rule_jsons"
-MODEL_JSONS_DIR = DATASET_DIR / "model_jsons"
-FUSION_JSONS_DIR = DATASET_DIR / "fusion_jsons"
-ANNOTATIONS_DIR = DATASET_DIR / "annotations"
-TOP_SAMPLES_PATH = DATASET_DIR / "top_annotate_samples.json"
-
-for dir_path in [RAW_IMAGES_DIR, RULE_JSONS_DIR, MODEL_JSONS_DIR, FUSION_JSONS_DIR, ANNOTATIONS_DIR]:
-    dir_path.mkdir(parents=True, exist_ok=True)
 
 # ======================================
 # 数据模型
@@ -410,8 +406,7 @@ async def get_raw(image_id: str):
 # ======================================
 # OCR标注相关配置
 # ======================================
-PROJECT_ROOT = BASE_DIR.parent.parent
-CLUSTERS_DIR = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters"
+CLUSTERS_DIR = DATASET_DIR / "clusters"
 CLUSTERS_JSON = CLUSTERS_DIR / "hog_clusters.json"
 LABELS_JSON = CLUSTERS_DIR / "labeling" / "labels.json"
 
@@ -679,7 +674,7 @@ def get_cluster_recommend(cluster_id: int, mode: str = "global"):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+        img_path = str(DATASET_DIR / "pdf_chars" / f"{char_id}.png")
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -714,7 +709,7 @@ def get_cluster_recommend(cluster_id: int, mode: str = "global"):
         char_id = char_info.get("char_id", "")
         img_path = char_info.get("image_path", "")
         if not img_path:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+            img_path = str(DATASET_DIR / "pdf_chars" / f"{char_id}.png")
 
         target_feat = extract_hog_features(img_path)
         if target_feat is None:
@@ -797,7 +792,7 @@ def get_recommend_images(cluster_id: int, char: str):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+        img_path = str(DATASET_DIR / "pdf_chars" / f"{char_id}.png")
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -814,7 +809,7 @@ def get_recommend_images(cluster_id: int, char: str):
         char_id = char_info.get("char_id", "")
         img_path = char_info.get("image_path", "")
         if not img_path:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+            img_path = str(DATASET_DIR / "pdf_chars" / f"{char_id}.png")
 
         target_feat = extract_hog_features(img_path)
         if target_feat is None:
@@ -964,7 +959,7 @@ def compute_pseudo_clusters_sync(char):
 
         anchor_features = {}
         for item in anchor_char_ids:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{item["char_id"]}.png')
+            img_path = str(DATASET_DIR / "pdf_chars" / f'{item["char_id"]}.png')
             feat = extract_hog_features(img_path)
             if feat is not None:
                 anchor_features[item["char_id"]] = feat
@@ -995,7 +990,7 @@ def compute_pseudo_clusters_sync(char):
 
             for idx, char_info in unlabeled_indices[:20]:
                 char_id = char_info.get("char_id", "")
-                img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+                img_path = str(DATASET_DIR / "pdf_chars" / f'{char_id}.png')
                 target_feat = extract_hog_features(img_path)
                 if target_feat is None:
                     continue
@@ -1084,7 +1079,7 @@ async def get_pseudo_label_cluster_images(request: Request):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+        img_path = str(DATASET_DIR / "pdf_chars" / f'{char_id}.png')
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -1102,7 +1097,7 @@ async def get_pseudo_label_cluster_images(request: Request):
             continue
 
         char_id = char_info.get("char_id", "")
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+        img_path = str(DATASET_DIR / "pdf_chars" / f'{char_id}.png')
         target_feat = extract_hog_features(img_path)
         if target_feat is None:
             continue
@@ -1129,18 +1124,18 @@ async def get_pseudo_label_cluster_images(request: Request):
 # ======================================
 # 10. 获取汉字图片列表
 # ======================================
-@app.get("/api/char-images/list")
+@app.get("/api/char-images/search")
 async def get_char_images_list(char: str):
     try:
         # 从labels.json中筛选该汉字的图片
         labeled_images = []
-        label_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "labeling" / "labels.json"
+        label_file = DATASET_DIR / "clusters" / "labeling" / "labels.json"
         if label_file.exists():
             with open(label_file, "r", encoding="utf-8") as f:
                 labels = json.load(f)
             
             # 从hog_clusters.json中查找图片
-            clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "hog_clusters.json"
+            clusters_file = DATASET_DIR / "clusters" / "hog_clusters.json"
             if clusters_file.exists():
                 with open(clusters_file, "r", encoding="utf-8") as f:
                     clusters_data = json.load(f)
@@ -1173,7 +1168,7 @@ async def get_char_images_list(char: str):
 # ======================================
 @app.get("/api/char-images/{image_name:path}")
 async def get_char_image(image_name: str):
-    char_dir = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars"
+    char_dir = DATASET_DIR / "pdf_chars"
     
     for ext in [".png", ".jpg", ".jpeg"]:
         img_file = char_dir / f"{image_name}{ext}" if not image_name.endswith(ext) else char_dir / image_name
@@ -1193,7 +1188,7 @@ async def get_char_image(image_name: str):
 # ======================================
 @app.get("/api/line-images/{line_path:path}")
 async def get_line_image(line_path: str):
-    line_dir = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_lines"
+    line_dir = DATASET_DIR / "pdf_lines"
     line_file = line_dir / f"{line_path}.png"
 
     if not line_file.exists():
@@ -1214,8 +1209,8 @@ async def get_line_image(line_path: str):
 async def get_line_status():
     try:
         # 读取聚类数据
-        clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "hog_clusters.json"
-        labels_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "labeling" / "labels.json"
+        clusters_file = DATASET_DIR / "clusters" / "hog_clusters.json"
+        labels_file = DATASET_DIR / "clusters" / "labeling" / "labels.json"
         
         if not clusters_file.exists() or not labels_file.exists():
             return {"code": -1, "msg": "文件不存在"}

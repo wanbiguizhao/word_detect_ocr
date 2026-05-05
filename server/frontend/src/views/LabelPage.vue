@@ -287,7 +287,7 @@ const loadDetail = async () => {
   }
 }
 
-const goBack = () => router.back()
+const goBack = () => router.push('/segment')
 onMounted(() => loadDetail())
 </script>
 
