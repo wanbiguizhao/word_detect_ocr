@@ -182,3 +182,4 @@ filtered_chars/*
 *datahome/*
 bussiness/datahome
 ocr_system/data
+bussiness/migration/data/char_feature_db.json

@@ -10,6 +10,8 @@ import PseudoLabelDetailPage from '../views/PseudoLabelDetailPage.vue'
 import CharManagementPage from '../views/CharManagementPage.vue'
 import LineCheckPage from '../views/LineCheckPage.vue'
 import LineDetailPage from '../views/LineDetailPage.vue'
+import MigrationListPage from '../views/MigrationListPage.vue'
+import MigrationDetailPage from '../views/MigrationDetailPage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomePage },
@@ -23,6 +25,8 @@ const routes = [
   { path: '/char-management', name: 'char-management', component: CharManagementPage },
   { path: '/line-check', name: 'line-check', component: LineCheckPage },
   { path: '/line-detail/:lineName', name: 'line-detail', component: LineDetailPage },
+  { path: '/migration-list', name: 'migration-list', component: MigrationListPage },
+  { path: '/migration-detail/:char', name: 'migration-detail', component: MigrationDetailPage },
 ]
 
 const router = createRouter({
