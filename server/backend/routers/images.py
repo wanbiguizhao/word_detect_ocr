@@ -166,21 +166,124 @@ async def get_raw(image_id: str):
 
 @router.get("/api/char-images/{image_name:path}")
 async def get_char_image(image_name: str):
-    from config import PROJECT_ROOT
-    char_dir = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars"
-
-    for ext in [".png", ".jpg", ".jpeg"]:
-        img_file = char_dir / f"{image_name}{ext}" if not image_name.endswith(ext) else char_dir / image_name
-        if img_file.exists():
-            with open(img_file, "rb") as f:
+    from config import PROJECT_ROOT, DATASET_DIR
+    
+    # 提取纯文件名（去掉路径和扩展名）
+    filename = image_name
+    if "\\" in filename:
+        filename = filename.split("\\")[-1]
+    elif "/" in filename:
+        filename = filename.split("/")[-1]
+    
+    # 去掉扩展名
+    base_name = filename
+    for ext in [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]:
+        if base_name.endswith(ext):
+            base_name = base_name[:-len(ext)]
+            break
+    
+    # 1. 首先尝试完整路径（处理聚类数据中的绝对路径）
+    if "\\" in image_name or ("/" in image_name and len(image_name) > 20):
+        full_path = Path(image_name)
+        if full_path.exists():
+            with open(full_path, "rb") as f:
                 content = f.read()
-
             response = Response(content)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Content-Type"] = "image/png"
             return response
+        
+        for ext in [".png", ".jpg", ".jpeg"]:
+            if not image_name.lower().endswith(ext):
+                full_path_with_ext = Path(f"{image_name}{ext}")
+                if full_path_with_ext.exists():
+                    with open(full_path_with_ext, "rb") as f:
+                        content = f.read()
+                    response = Response(content)
+                    response.headers["Access-Control-Allow-Origin"] = "*"
+                    response.headers["Content-Type"] = "image/png"
+                    return response
+    
+    # 2. 尝试多个可能的字符图片目录
+    possible_dirs = [
+        DATASET_DIR / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars",
+        DATASET_DIR / "clusters" / "char_images",
+        DATASET_DIR,
+        PROJECT_ROOT / "bussiness" / "datahome" / "pdf01",
+    ]
 
-    raise HTTPException(status_code=404, detail="图片不存在")
+    for char_dir in possible_dirs:
+        for ext in [".png", ".jpg", ".jpeg"]:
+            img_file = char_dir / f"{base_name}{ext}"
+            if img_file.exists():
+                with open(img_file, "rb") as f:
+                    content = f.read()
+                response = Response(content)
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                response.headers["Content-Type"] = "image/png"
+                return response
+    
+    # 3. 从行图片中裁剪字符（最后的尝试）
+    try:
+        # 从 char_id 中解析出行信息
+        # 格式: page_X_line_Y_char_Z
+        parts = base_name.split("_")
+        if len(parts) >= 4 and parts[0] == "page":
+            page_num = parts[1]
+            line_idx = parts[3]
+            line_name = f"page_{page_num}_line_{line_idx}"
+            
+            # 查找行图片
+            line_dir = DATASET_DIR / "pdf_lines"
+            line_file = None
+            for ext in [".png", ".jpg", ".jpeg"]:
+                candidate = line_dir / f"{line_name}{ext}"
+                if candidate.exists():
+                    line_file = candidate
+                    break
+            
+            if line_file:
+                # 尝试从聚类数据中获取字符坐标
+                clusters_path = DATASET_DIR / "clusters" / "hog_clusters.json"
+                if clusters_path.exists():
+                    import json
+                    with open(clusters_path, "r", encoding="utf-8") as f:
+                        clusters_data = json.load(f)
+                    
+                    # 搜索所有聚类找到匹配的字符
+                    for cluster_id, chars in clusters_data.get("clusters", {}).items():
+                        for char_info in chars:
+                            if char_info.get("char_id") == base_name:
+                                # 找到字符信息，提取坐标
+                                lineage = char_info.get("lineage", {})
+                                col_start = lineage.get("col_start", 0)
+                                col_end = lineage.get("col_end", 100)
+                                width = lineage.get("width", col_end - col_start)
+                                
+                                # 裁剪行图片
+                                from PIL import Image
+                                with Image.open(line_file) as img:
+                                    # 计算裁剪区域
+                                    left = col_start
+                                    top = 0
+                                    right = min(col_end, img.width)
+                                    bottom = img.height
+                                    
+                                    cropped = img.crop((left, top, right, bottom))
+                                    import io
+                                    buffer = io.BytesIO()
+                                    cropped.save(buffer, format="PNG")
+                                    content = buffer.getvalue()
+                                
+                                response = Response(content)
+                                response.headers["Access-Control-Allow-Origin"] = "*"
+                                response.headers["Content-Type"] = "image/png"
+                                return response
+    except Exception as e:
+        print(f"Error cropping char from line image: {e}")
+
+    raise HTTPException(status_code=404, detail=f"图片不存在: {image_name}")
 
 
 @router.get("/api/line-images/{line_path:path}")

@@ -1293,3 +1293,266 @@ async def get_line_status():
     except Exception as e:
         print(f"获取行状态失败: {e}")
         return {"code": -1, "msg": str(e)}
+
+# ======================================
+# 13. 迁移数据接口
+# ======================================
+from config import (
+    CHAR_FEATURE_DB_PATH,
+    CHAR_MIGRATION_MAP_PATH,
+    CHAR_PRIORITY_LIST_PATH,
+    GLOBAL_CHAR_REGISTRY_PATH
+)
+
+@app.get("/api/migration/feature-db")
+async def get_char_feature_db():
+    """获取汉字特征库"""
+    try:
+        data = load_json_file(CHAR_FEATURE_DB_PATH)
+        if data is None:
+            return {"code": -1, "msg": "文件不存在"}
+        return {"code": 0, "data": data}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+@app.get("/api/migration/migration-map")
+async def get_migration_map():
+    """获取迁移映射表"""
+    try:
+        data = load_json_file(CHAR_MIGRATION_MAP_PATH)
+        if data is None:
+            return {"code": -1, "msg": "文件不存在"}
+        return {"code": 0, "data": data}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+@app.get("/api/migration/priority-list")
+async def get_priority_list(keyword: str = None):
+    """获取标注优先级列表"""
+    try:
+        data = load_json_file(CHAR_PRIORITY_LIST_PATH)
+        if data is None:
+            return {"code": -1, "msg": "文件不存在"}
+        
+        # 获取已标注的字符统计
+        labeled_counts = get_labeled_char_counts()
+        
+        # 从priorities数组中提取数据
+        priorities = data.get("priorities", [])
+        
+        # 添加已标注数量
+        result = []
+        for item in priorities:
+            char = item.get("char", "")
+            labeled_count = labeled_counts.get(char, 0)
+            result.append({
+                **item,
+                "labeled_count": labeled_count
+            })
+        
+        # 如果有搜索关键词，进行过滤
+        if keyword:
+            result = [item for item in result if keyword in item.get("char", "")]
+        
+        return {"code": 0, "data": result}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+def get_labeled_char_counts() -> dict:
+    """获取已标注字符的统计"""
+    labeled_counts = {}
+    
+    from config import LABELS_JSON
+    labels_data = load_json_file(LABELS_JSON) or {}
+    
+    for cluster_id, label_info in labels_data.items():
+        char_labels = label_info.get("char_labels", {})
+        for idx, label_data in char_labels.items():
+            char = label_data.get("char", "")
+            if char:
+                labeled_counts[char] = labeled_counts.get(char, 0) + 1
+    
+    return labeled_counts
+
+@app.get("/api/migration/registry")
+async def get_global_registry():
+    """获取全局汉字注册表"""
+    try:
+        data = load_json_file(GLOBAL_CHAR_REGISTRY_PATH)
+        if data is None:
+            return {"code": -1, "msg": "文件不存在"}
+        return {"code": 0, "data": data}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+@app.get("/api/migration/recommend-chars")
+async def get_recommend_chars(top_n: int = 20):
+    """获取推荐标注的汉字列表"""
+    try:
+        data = load_json_file(CHAR_PRIORITY_LIST_PATH)
+        if data is None:
+            return {"code": -1, "msg": "优先级列表不存在"}
+        
+        priorities = data.get("priorities", [])
+        recommend_chars = [
+            item for item in priorities 
+            if item["action"] == "优先标注" or item["target_count"] == 0
+        ]
+        
+        recommend_chars.sort(key=lambda x: x["priority_score"], reverse=True)
+        
+        return {"code": 0, "data": recommend_chars[:top_n]}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+# ======================================
+# 14. 迁移学习图片匹配API
+# ======================================
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from bussiness.migration.manager import MigrationManager
+
+migration_manager = MigrationManager()
+
+@app.get("/api/migration/image-matches/{char}")
+async def get_image_matches(char: str, top_n: int = 20):
+    """获取指定汉字在目标数据集中的匹配图片"""
+    try:
+        target_dataset_id = DATASET_ID
+        confirmed, pending = migration_manager.find_image_matches(target_dataset_id, char, top_n)
+        all_matches = confirmed + pending
+        return {"code": 0, "matches": all_matches}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+class BatchLabelRequest(BaseModel):
+    char: str
+    charIds: List[str]
+
+
+@app.post("/api/migration/batch-label")
+async def batch_label(request: BatchLabelRequest):
+    """批量标注图片为指定汉字"""
+    try:
+        char = request.char
+        char_ids = request.charIds
+        
+        print(f"DEBUG batch-label: char={char}, charIds={char_ids}")
+        
+        if not char or not char_ids:
+            return {"code": -1, "msg": "参数错误"}
+        
+        labels_data = load_json_file(LABELS_JSON) or {}
+        clusters_data = load_json_file(CLUSTERS_JSON) or {}
+        clusters = clusters_data.get("clusters", {})
+        
+        print(f"DEBUG batch-label: 加载到 {len(clusters)} 个聚类")
+        
+        labeled_count = 0
+        
+        for char_id in char_ids:
+            found = False
+            
+            # 尝试两种匹配方式：
+            # 1. 直接匹配完整的 char_id（如 'page_10_line_10_char_0'）
+            # 2. 解析 clusterId_index 格式（如 '754_7'）
+            parsed_cluster_id = None
+            parsed_idx = None
+            
+            # 尝试解析 clusterId_index 格式
+            if '_' in char_id:
+                parts = char_id.split('_')
+                if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+                    parsed_cluster_id = parts[0]
+                    parsed_idx = int(parts[1])
+            
+            for cluster_id, cluster_chars in clusters.items():
+                # 如果解析成功，直接定位到指定聚类和索引
+                if parsed_cluster_id is not None and parsed_idx is not None and cluster_id == parsed_cluster_id:
+                    if parsed_idx < len(cluster_chars):
+                        print(f"DEBUG batch-label: 通过 clusterId_index 匹配: char_id={char_id}, cluster_id={cluster_id}, idx={parsed_idx}")
+                        # 确保聚类数据结构完整
+                        if cluster_id not in labels_data:
+                            labels_data[cluster_id] = {
+                                "char": None,
+                                "chars": {},
+                                "status": "unlabeled",
+                                "confidence": None,
+                                "alias": "",
+                                "char_labels": {}
+                            }
+                        # 确保 char_labels 字段存在
+                        if "char_labels" not in labels_data[cluster_id]:
+                            labels_data[cluster_id]["char_labels"] = {}
+                        
+                        labels_data[cluster_id]["char_labels"][str(parsed_idx)] = {
+                            "char": char,
+                            "labeled_at": datetime.datetime.now().isoformat()
+                        }
+                        
+                        all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
+                        if all_chars:
+                            from collections import Counter
+                            char_counts = Counter(all_chars)
+                            most_common = char_counts.most_common(1)[0]
+                            labels_data[cluster_id]["char"] = most_common[0]
+                            labels_data[cluster_id]["confidence"] = most_common[1] / len(all_chars)
+                            labels_data[cluster_id]["chars"] = dict(char_counts)
+                            labels_data[cluster_id]["status"] = "labeled"
+                        
+                        labeled_count += 1
+                        found = True
+                        break
+                else:
+                    # 传统方式：遍历查找完整匹配的 char_id
+                    for idx, char_info in enumerate(cluster_chars):
+                        if char_info.get("char_id") == char_id:
+                            print(f"DEBUG batch-label: 通过完整 char_id 匹配: char_id={char_id}, cluster_id={cluster_id}, idx={idx}")
+                            # 确保聚类数据结构完整
+                            if cluster_id not in labels_data:
+                                labels_data[cluster_id] = {
+                                    "char": None,
+                                    "chars": {},
+                                    "status": "unlabeled",
+                                    "confidence": None,
+                                    "alias": "",
+                                    "char_labels": {}
+                                }
+                            # 确保 char_labels 字段存在
+                            if "char_labels" not in labels_data[cluster_id]:
+                                labels_data[cluster_id]["char_labels"] = {}
+                            
+                            labels_data[cluster_id]["char_labels"][str(idx)] = {
+                                "char": char,
+                                "labeled_at": datetime.datetime.now().isoformat()
+                            }
+                            
+                            all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
+                            if all_chars:
+                                from collections import Counter
+                                char_counts = Counter(all_chars)
+                                most_common = char_counts.most_common(1)[0]
+                                labels_data[cluster_id]["char"] = most_common[0]
+                                labels_data[cluster_id]["confidence"] = most_common[1] / len(all_chars)
+                                labels_data[cluster_id]["chars"] = dict(char_counts)
+                                labels_data[cluster_id]["status"] = "labeled"
+                            
+                            labeled_count += 1
+                            found = True
+                            break
+                if found:
+                    break
+        
+        print(f"DEBUG batch-label: 标注完成，共标注 {labeled_count} 张图片")
+        print(f"DEBUG batch-label: LABELS_JSON 路径: {LABELS_JSON}")
+        
+        with open(LABELS_JSON, "w", encoding="utf-8") as f:
+            json.dump(labels_data, f, ensure_ascii=False, indent=2)
+        
+        return {"code": 0, "count": labeled_count, "msg": f"成功标注 {labeled_count} 张图片"}
+    except Exception as e:
+        print(f"ERROR batch-label: {str(e)}")
+        return {"code": -1, "msg": str(e)}
