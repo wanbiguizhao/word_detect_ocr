@@ -75,6 +75,20 @@
           <a-tag color="red">缺失定位</a-tag>
         </div>
       </div>
+
+      <div class="feature-card" @click="goTo('/migration-list')">
+        <div class="feature-icon">
+          <span class="icon">🚀</span>
+        </div>
+        <h2 class="feature-title">汉字OCR标注迁移</h2>
+        <p class="feature-desc">
+          基于视觉特征匹配，利用已有标注数据快速标注新数据集
+        </p>
+        <div class="feature-tags">
+          <a-tag color="purple">迁移学习</a-tag>
+          <a-tag color="green">智能推荐</a-tag>
+        </div>
+      </div>
     </div>
 
     <div class="footer">

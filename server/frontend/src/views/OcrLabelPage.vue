@@ -14,6 +14,7 @@
           <a-radio value="labeled">已标记数量</a-radio>
           <a-radio value="unlabeled">未标记数量</a-radio>
           <a-radio value="chaos">混乱度</a-radio>
+          <a-radio value="confidence">置信度</a-radio>
         </a-radio-group>
       </div>
       <div class="filter-controls">
@@ -65,6 +66,13 @@
             :status="record.chaos > 0.5 ? 'exception' : record.chaos > 0.2 ? 'normal' : 'success'"
             size="small"
           />
+        </template>
+      </a-table-column>
+      <a-table-column title="置信度" width="100">
+        <template #default="{ record }">
+          <a-tag :color="record.confidence ? (record.confidence >= 0.8 ? 'green' : record.confidence >= 0.5 ? 'orange' : 'red') : 'default'">
+            {{ record.confidence ? `${(record.confidence * 100).toFixed(0)}%` : '-' }}
+          </a-tag>
         </template>
       </a-table-column>
       <a-table-column title="图片数量" data-index="totalCount" width="100" />
@@ -127,6 +135,10 @@ const displayClusters = computed(() => {
         return b.unlabeledCount - a.unlabeledCount
       case 'chaos':
         return b.chaos - a.chaos
+      case 'confidence':
+        const confA = a.confidence || 0
+        const confB = b.confidence || 0
+        return confB - confA
       default:
         return 0
     }
@@ -160,32 +172,13 @@ const calculateChaos = (chars) => {
   return maxEntropy > 0 ? entropy / maxEntropy : 0
 }
 
-const calculateSuggestedChar = (chars) => {
-  if (!chars || chars.length === 0) return null
-
-  const charCount = {}
-  chars.forEach(char => {
-    const suggested = char.lineage?.suggested_char || char.lineage?.char || 'unknown'
-    charCount[suggested] = (charCount[suggested] || 0) + 1
-  })
-
-  let maxCount = 0
-  let suggested = null
-  Object.entries(charCount).forEach(([char, count]) => {
-    if (count > maxCount) {
-      maxCount = count
-      suggested = char
-    }
-  })
-
-  return suggested
-}
-
 const loadData = async () => {
   loading.value = true
   try {
-    const clustersRes = await axios.get('/api/clusters')
-    const labelsRes = await axios.get('/api/cluster-labels')
+    const [clustersRes, labelsRes] = await Promise.all([
+      axios.get('/api/clusters'),
+      axios.get('/api/cluster-labels')
+    ])
 
     const clustersData = clustersRes.data.clusters || {}
     const labelsData = labelsRes.data.data || {}
@@ -224,7 +217,7 @@ const loadData = async () => {
         labeledCount,
         unlabeledCount,
         chaos: calculateChaos(charList),
-        suggestedChar: clusterLabels.char || calculateSuggestedChar(charList),
+        confidence: clusterLabels.confidence || null,
         charsDisplay,
         alias: clusterLabels.alias || '',
         status
@@ -263,7 +256,6 @@ const getStatusText = (status) => {
 }
 
 const handleSort = () => {
-  // 排序由computed处理
 }
 
 const saveAlias = async (record) => {
@@ -279,7 +271,8 @@ const saveAlias = async (record) => {
 
 const goClusterLabel = (clusterId) => {
   highlightedClusterId.value = parseInt(clusterId)
-  window.open(`/ocr-label/${clusterId}`, '_blank')
+  const dataset = localStorage.getItem('selectedDataset') || 'pdf01'
+  window.open(`/ocr-label/${clusterId}?dataset=${encodeURIComponent(dataset)}`, '_blank')
 }
 
 const goBack = () => {
