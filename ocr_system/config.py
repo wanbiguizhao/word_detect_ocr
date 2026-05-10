@@ -18,7 +18,14 @@ WEIGHT_DECAY = 1e-5
 EARLY_STOP_PATIENCE = 10
 
 # 模型参数
-NUM_CLASSES = 1156  # 所有汉字类别（数据增强后）
+def _get_num_classes():
+    try:
+        from configs.char_mapping import CharMappingManager
+        return CharMappingManager().get_stats()["next_custom_id"]
+    except Exception:
+        return 7000  # GB2312(6763) + 预留(100) + 部分自定义
+
+NUM_CLASSES = _get_num_classes()
 IMAGE_SIZE = (64, 64)
 NUM_WORKERS = 4
 
