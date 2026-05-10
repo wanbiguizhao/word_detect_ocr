@@ -5,12 +5,13 @@ import numpy as np
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
 import asyncio
+from collections import defaultdict, Counter
 
 # ======================================
 # 从 config.py 导入配置
@@ -18,6 +19,7 @@ import asyncio
 from config import (
     DATASET_ID,
     DATASET_DIR,
+    DATAHOME_DIR,
     RAW_IMAGES_DIR,
     RULE_JSONS_DIR,
     MODEL_JSONS_DIR,
@@ -26,6 +28,7 @@ from config import (
     TOP_SAMPLES_PATH,
     CLUSTERS_JSON,
     LABELS_JSON,
+    PSEUDO_LABEL_CACHE_PATH,
     pseudo_label_cache,
     executor
 )
@@ -51,6 +54,75 @@ async def set_encoding(request: Request, call_next):
     return response
 
 # ======================================
+# 伪标签缓存持久化
+# ======================================
+def load_pseudo_label_cache():
+    """从文件加载伪标签缓存"""
+    try:
+        if PSEUDO_LABEL_CACHE_PATH.exists():
+            cached_data = load_json_file(PSEUDO_LABEL_CACHE_PATH)
+            if cached_data:
+                pseudo_label_cache.update(cached_data)
+                print(f"已加载伪标签缓存: {len(pseudo_label_cache)} 条")
+    except Exception as e:
+        print(f"加载伪标签缓存失败: {e}")
+
+def save_pseudo_label_cache():
+    """保存伪标签缓存到文件"""
+    try:
+        PSEUDO_LABEL_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(PSEUDO_LABEL_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(pseudo_label_cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存伪标签缓存失败: {e}")
+
+# 应用启动时加载缓存
+load_pseudo_label_cache()
+
+# ======================================
+# SSE事件订阅机制
+# ======================================
+subscribers = defaultdict(list)  # {channel: [queue1, queue2, ...]}
+lock = asyncio.Lock()
+
+async def publish_event(channel: str, event_type: str, data: dict):
+    """发布事件到指定频道"""
+    async with lock:
+        message = json.dumps({
+            "type": event_type,
+            "data": data,
+            "timestamp": datetime.datetime.now().isoformat()
+        }, ensure_ascii=False)
+        
+        # 复制订阅者列表以避免迭代时修改
+        queues = list(subscribers.get(channel, []))
+        for queue in queues[:]:
+            try:
+                await queue.put(message)
+            except asyncio.QueueEmpty:
+                subscribers[channel].remove(queue)
+
+@app.get("/api/events/{channel}")
+async def event_stream(channel: str):
+    """SSE事件流接口"""
+    queue = asyncio.Queue(maxsize=10)
+    
+    async with lock:
+        subscribers[channel].append(queue)
+    
+    async def event_generator():
+        try:
+            while True:
+                message = await queue.get()
+                yield f"data: {message}\n\n"
+        except asyncio.CancelledError:
+            async with lock:
+                if queue in subscribers.get(channel, []):
+                    subscribers[channel].remove(queue)
+    
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+# ======================================
 # 数据模型
 # ======================================
 class Line(BaseModel):
@@ -61,95 +133,30 @@ class AnnotationSubmit(BaseModel):
     lines: List[Line]
 
 # ======================================
-# 工具函数
+# 从 utils.py 导入工具函数
 # ======================================
-def load_json_file(file_path: Path) -> Optional[dict]:
-    if not file_path.exists():
-        return None
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-def extract_hog_features(image_path: str) -> Optional[np.ndarray]:
-    try:
-        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        if img is None:
-            return None
-        target_size = (64, 64)
-        img = cv2.resize(img, target_size)
-        hog = cv2.HOGDescriptor(
-            _winSize=(target_size[0], target_size[1]),
-            _blockSize=(16, 16),
-            _blockStride=(8, 8),
-            _cellSize=(8, 8),
-            _nbins=9
-        )
-        features = hog.compute(img)
-        return features.flatten()
-    except Exception:
-        return None
-
-def get_labeled_clusters_info():
-    if not LABELS_JSON.exists():
-        return {}
-    labels_data = load_json_file(LABELS_JSON) or {}
-    result = {}
-    for cluster_id, label_info in labels_data.items():
-        if label_info.get("status") == "labeled" and label_info.get("char"):
-            result[cluster_id] = {
-                "char": label_info["char"],
-                "char_labels": label_info.get("char_labels", {}),
-                "confidence": label_info.get("confidence", 0)
-            }
-    return result
-
-def chars_to_lines(chars: List[dict], image_width: int) -> List[dict]:
-    line_dict = {}
-    for char in chars:
-        col_start = char.get("col_start")
-        if col_start is not None and col_start != 0:
-            line_dict[col_start] = "red"
-    for char in chars:
-        col_end = char.get("col_end")
-        if col_end is not None and col_end != 0:
-            line_dict[col_end] = "green"
-
-    lines = [{"pos": pos, "color": color} for pos, color in line_dict.items()]
-    lines.sort(key=lambda x: x["pos"])
-    return lines
-
-def lines_to_chars(lines: List[dict], image_width: int) -> List[dict]:
-    positions = sorted([item["pos"] for item in lines])
-    chars = []
-    for i in range(0, len(positions), 2):
-        if i + 1 >= len(positions):
-            break
-        left = positions[i]
-        right = positions[i + 1]
-        chars.append({
-            "col_start": left,
-            "col_end": right,
-            "width": right - left
-        })
-    return chars
-
-def get_image_width(image_id: str) -> int:
-    for ext in [".png", ".jpg", ".jpeg"]:
-        img_file = RAW_IMAGES_DIR / f"{image_id}{ext}"
-        if img_file.exists():
-            with Image.open(img_file) as img:
-                return img.width
-    raise HTTPException(status_code=404, detail="获取图片宽度失败")
+from utils import (
+    load_json_file,
+    extract_hog_features,
+    get_labeled_clusters_info,
+    chars_to_lines,
+    lines_to_chars,
+    get_image_width
+)
 
 # ======================================
-# 1. 列表接口（POST筛选，修复完成）
+# 1. 列表接口（POST筛选，修复完成，支持服务端分页）
 # ======================================
+class ImageListRequest(BaseModel):
+    is_annotated: Optional[str] = None
+    page: int = 1
+    page_size: int = 10
+
 @app.post("/api/images")
-async def get_images(request: Request):
-    data = await request.json()
-    is_annotated = data.get("is_annotated")
+async def get_images(body: ImageListRequest):
+    is_annotated = body.is_annotated
+    page = body.page
+    page_size = body.page_size
 
     sample_list = load_json_file(TOP_SAMPLES_PATH)
     items = []
@@ -192,7 +199,22 @@ async def get_images(request: Request):
             "updated_at": updated_at
         })
     
-    return {"code": 0, "msg": "success", "data": items, "total": len(items)}
+    total = len(items)
+    
+    # 服务端分页
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_items = items[start:end]
+    
+    return {
+        "code": 0, 
+        "msg": "success", 
+        "data": paginated_items, 
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size
+    }
 
 # ======================================
 # 🔥 2. 【核心修复】恢复详情接口 + 支持特殊字符（解决404）
@@ -209,7 +231,7 @@ def get_detail(image_id: str):
     if not img_path:
         raise HTTPException(status_code=404, detail="图片不存在")
     
-    img_width = get_image_width(image_id)
+    img_width = get_image_width(image_id, RAW_IMAGES_DIR)
 
     # 加载所有切割数据
     rule_data = load_json_file(RULE_JSONS_DIR / f"{image_id}_chars.json") or {}
@@ -247,9 +269,9 @@ def get_detail(image_id: str):
 # 3. 保存标注接口
 # ======================================
 @app.post("/api/images/{image_id:path}/annotate")
-def save_anno(image_id: str, body: AnnotationSubmit):
+async def save_anno(image_id: str, body: AnnotationSubmit):
     lines_list = [line.model_dump() for line in body.lines]
-    img_width = get_image_width(image_id)
+    img_width = get_image_width(image_id, RAW_IMAGES_DIR)
     chars_list = lines_to_chars(lines_list, img_width)
 
     anno_data = {
@@ -263,6 +285,13 @@ def save_anno(image_id: str, body: AnnotationSubmit):
     save_path = ANNOTATIONS_DIR / f"{image_id}.json"
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(anno_data, f, ensure_ascii=False, indent=2)
+
+    # 发布标注更新事件
+    asyncio.create_task(publish_event(
+        "annotation",
+        "annotated",
+        {"image_id": image_id, "action": "annotate"}
+    ))
 
     return {"code": 0, "msg": "保存成功"}
 
@@ -322,7 +351,6 @@ def batch_save_cluster_labels(body: BatchLabelSave):
 
     all_chars = [v["char"] for v in labels_data[cluster_key]["char_labels"].values() if v.get("char")]
     if all_chars:
-        from collections import Counter
         char_counts = Counter(all_chars)
         most_common = char_counts.most_common(1)[0]
         labels_data[cluster_key]["char"] = most_common[0]
@@ -360,7 +388,7 @@ def batch_save_cluster_labels(body: BatchLabelSave):
 # 3.1 暂不标注接口
 # ======================================
 @app.post("/api/images/{image_id:path}/postpone")
-def postpone_anno(image_id: str):
+async def postpone_anno(image_id: str):
     save_path = ANNOTATIONS_DIR / f"{image_id}.json"
     
     if save_path.exists():
@@ -382,7 +410,41 @@ def postpone_anno(image_id: str):
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(anno_data, f, ensure_ascii=False, indent=2)
 
+    # 发布标注更新事件
+    asyncio.create_task(publish_event(
+        "annotation",
+        "postponed",
+        {"image_id": image_id, "action": "postpone"}
+    ))
+
     return {"code": 0, "msg": "已标记为暂不标注"}
+
+# ======================================
+# 3.2 取消暂不标注接口（回退机制）
+# ======================================
+@app.post("/api/images/{image_id:path}/unpostpone")
+async def unpostpone_anno(image_id: str):
+    save_path = ANNOTATIONS_DIR / f"{image_id}.json"
+    
+    if save_path.exists():
+        anno_data = load_json_file(save_path)
+        if anno_data:
+            anno_data["is_annotated"] = False
+            anno_data["is_postponed"] = False
+            anno_data["updated_at"] = datetime.datetime.now().isoformat()
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(anno_data, f, ensure_ascii=False, indent=2)
+            
+            # 发布标注更新事件
+            asyncio.create_task(publish_event(
+                "annotation",
+                "unpostponed",
+                {"image_id": image_id, "action": "unpostpone"}
+            ))
+            
+            return {"code": 0, "msg": "已取消暂不标注，恢复为未标注状态"}
+    
+    return {"code": 1, "msg": "标注文件不存在"}
 
 # ======================================
 # 4. 图片预览接口
@@ -401,14 +463,6 @@ async def get_raw(image_id: str):
             return response
 
     raise HTTPException(status_code=404, detail="图片不存在")
-
-
-# ======================================
-# OCR标注相关配置
-# ======================================
-CLUSTERS_DIR = DATASET_DIR / "clusters"
-CLUSTERS_JSON = CLUSTERS_DIR / "hog_clusters.json"
-LABELS_JSON = CLUSTERS_DIR / "labeling" / "labels.json"
 
 
 # ======================================
@@ -441,7 +495,6 @@ def get_cluster_labels():
     for cluster_data in data.values():
         char_labels = cluster_data.get("char_labels", {})
         if char_labels and "chars" not in cluster_data:
-            from collections import Counter
             all_chars = [v["char"] for v in char_labels.values() if v.get("char")]
             if all_chars:
                 cluster_data["chars"] = dict(Counter(all_chars))
@@ -493,7 +546,6 @@ def save_cluster_label(body: ClusterLabelSave):
 
         all_chars = [v["char"] for v in labels_data[cluster_key]["char_labels"].values()]
         if all_chars:
-            from collections import Counter
             char_counts = Counter(all_chars)
             most_common = char_counts.most_common(1)[0]
             labels_data[cluster_key]["char"] = most_common[0]
@@ -562,14 +614,48 @@ def get_cluster_images(cluster_id: int):
     
     cluster_labels = labels_data.get(cluster_key, {}).get("char_labels", {})
     
+    # 加载 lineage.json 获取字符位置信息
+    lineage_chars = {}
+    lineage_path = DATASET_DIR / "lineage.json"
+    if lineage_path.exists():
+        try:
+            lineage_data = load_json_file(lineage_path) or {}
+            lineage_chars = lineage_data.get("chars", {})
+        except Exception as e:
+            print(f"加载 lineage.json 失败: {e}")
+    
     result = []
     for idx, char_info in enumerate(chars):
         char_key = str(idx)
+        char_id = char_info.get("char_id", "")
+        
+        # 获取 lineage，优先从 lineage.json 读取
+        lineage = char_info.get("lineage", {})
+        
+        # 如果 lineage.json 中有该字符的信息，合并进来
+        if char_id in lineage_chars:
+            char_lineage = lineage_chars[char_id]
+            lineage.update({
+                "line_name": char_lineage.get("line_name"),
+                "col_start": char_lineage.get("col_start"),
+                "col_end": char_lineage.get("col_end"),
+                "width": char_lineage.get("width")
+            })
+        
+        # 尝试从 char_id 解析行信息作为回退
+        if not lineage.get("line_name") and char_id:
+            # char_id 格式通常为: page_10_line_5_char_0
+            parts = char_id.split('_')
+            if len(parts) >= 4:
+                # 构建 line_name: page_10_line_5
+                line_name = f"{parts[0]}_{parts[1]}_{parts[2]}"
+                lineage["line_name"] = line_name
+        
         result.append({
             "index": idx,
-            "char_id": char_info.get("char_id", ""),
+            "char_id": char_id,
             "image_path": char_info.get("image_path", ""),
-            "lineage": char_info.get("lineage", {}),
+            "lineage": lineage,
             "label": cluster_labels.get(char_key, {}).get("char", None)
         })
     
@@ -627,7 +713,6 @@ def get_cluster_recommend(cluster_id: int, mode: str = "global"):
                         })
         
         # 按字符分组，统计每个字符的标注数量
-        from collections import Counter
         char_counter = Counter([a["char"] for a in all_anchors])
         
         # 按字符频率排序
@@ -919,6 +1004,7 @@ async def get_pseudo_label_clusters(request: Request):
 
     clusters = result["clusters"]
     pseudo_label_cache[char] = {item["cluster_id"]: item for item in clusters}
+    save_pseudo_label_cache()  # 持久化到文件
     clusters.sort(key=lambda x: x["avg_similarity"], reverse=True)
 
     return {"code": 0, "char": char, "clusters": clusters, "cached": False}
@@ -1030,6 +1116,7 @@ def compute_pseudo_clusters_sync(char):
 def clear_pseudo_label_cache(char: str):
     if char in pseudo_label_cache:
         del pseudo_label_cache[char]
+        save_pseudo_label_cache()  # 持久化到文件
     return {"code": 0, "msg": f"已清除缓存: {char}"}
 
 
@@ -1037,6 +1124,7 @@ def clear_pseudo_label_cache(char: str):
 def clear_all_pseudo_label_cache():
     count = len(pseudo_label_cache)
     pseudo_label_cache.clear()
+    save_pseudo_label_cache()  # 持久化到文件
     return {"code": 0, "msg": f"已清除全部缓存，共 {count} 条"}
 
 
@@ -1167,8 +1255,10 @@ async def get_char_images_list(char: str):
 # 11. 获取聚类图片文件
 # ======================================
 @app.get("/api/char-images/{image_name:path}")
-async def get_char_image(image_name: str):
-    char_dir = DATASET_DIR / "pdf_chars"
+async def get_char_image(image_name: str, dataset: str = None):
+    # 优先使用请求参数，否则使用配置文件中的数据集
+    target_dataset_id = dataset or DATASET_ID
+    char_dir = DATAHOME_DIR / target_dataset_id / "pdf_chars"
     
     for ext in [".png", ".jpg", ".jpeg"]:
         img_file = char_dir / f"{image_name}{ext}" if not image_name.endswith(ext) else char_dir / image_name
@@ -1187,8 +1277,10 @@ async def get_char_image(image_name: str):
 # 10. 获取行图片文件
 # ======================================
 @app.get("/api/line-images/{line_path:path}")
-async def get_line_image(line_path: str):
-    line_dir = DATASET_DIR / "pdf_lines"
+async def get_line_image(line_path: str, dataset: str = None):
+    # 优先使用请求参数，否则使用配置文件中的数据集
+    target_dataset_id = dataset or DATASET_ID
+    line_dir = DATAHOME_DIR / target_dataset_id / "pdf_lines"
     line_file = line_dir / f"{line_path}.png"
 
     if not line_file.exists():
@@ -1407,7 +1499,287 @@ async def get_recommend_chars(top_n: int = 20):
 
 
 # ======================================
-# 14. 迁移学习图片匹配API
+# 14. 标注优先级引擎API
+# ======================================
+class PriorityItem(BaseModel):
+    image_id: str
+    al_score: float = 0.0
+    similarity_score: float = 0.0
+    rarity_score: float = 0.0
+    priority_score: float = 0.0
+    is_annotated: bool = False
+    is_postponed: bool = False
+
+class ClusterPriorityItem(BaseModel):
+    cluster_id: int
+    cluster_size: int
+    is_labeled: bool = False
+    confusion_score: float = 0.0
+    priority_score: float = 0.0
+    char_count: int = 0
+
+def calculate_priority(sample_info: dict, labeled_counts: dict) -> float:
+    """
+    计算样本优先级分数
+    公式: priority = al_score * 0.4 + similarity_score * 0.3 + rarity_score * 0.3
+    """
+    al_score = sample_info.get("total_score", 0.0)
+    similarity_score = sample_info.get("similarity_score", 0.0)
+    
+    # 稀有度计算：基于主动学习分数，分数越高表示模型越不确定，越需要标注
+    rarity_score = al_score  # 直接使用主动学习分数作为稀有度
+    
+    priority = al_score * 0.4 + similarity_score * 0.3 + rarity_score * 0.3
+    return priority
+
+@app.get("/api/annotation/priority-queue")
+async def get_priority_queue(limit: int = 20, skip_annotated: bool = True):
+    """
+    获取标注优先级队列
+    返回按优先级排序的待标注样本列表
+    """
+    try:
+        sample_list = load_json_file(TOP_SAMPLES_PATH)
+        if not sample_list:
+            return {"code": 0, "data": [], "total": 0}
+        
+        # 获取已标注统计
+        labeled_counts = {}
+        for anno_file in ANNOTATIONS_DIR.glob("*.json"):
+            anno_data = load_json_file(anno_file)
+            if anno_data and anno_data.get("is_annotated"):
+                image_id = anno_file.stem
+                labeled_counts[image_id] = True
+        
+        # 计算每个样本的优先级
+        priority_items = []
+        for sample in sample_list:
+            image_id = sample.get("img_name", "")
+            if not image_id:
+                continue
+            
+            is_annotated = image_id in labeled_counts
+            
+            if skip_annotated and is_annotated:
+                continue
+            
+            anno_file = ANNOTATIONS_DIR / f"{image_id}.json"
+            anno_data = load_json_file(anno_file)
+            is_postponed = anno_data.get("is_postponed", False) if anno_data else False
+            
+            if skip_annotated and is_postponed:
+                continue
+            
+            priority_score = calculate_priority(sample, labeled_counts)
+            
+            priority_items.append({
+                "image_id": image_id,
+                "image_name": f"{image_id}.png",
+                "al_score": round(sample.get("total_score", 0.0), 4),
+                "priority_score": round(priority_score, 4),
+                "is_annotated": is_annotated,
+                "is_postponed": is_postponed,
+                "updated_at": anno_data.get("updated_at", "") if anno_data else ""
+            })
+        
+        # 按优先级排序
+        priority_items.sort(key=lambda x: x["priority_score"], reverse=True)
+        
+        return {
+            "code": 0,
+            "data": priority_items[:limit],
+            "total": len(priority_items)
+        }
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+@app.get("/api/annotation/next")
+async def get_next_sample():
+    """
+    获取下一个待标注样本（最高优先级）
+    """
+    try:
+        result = await get_priority_queue(limit=1, skip_annotated=True)
+        if result["code"] == 0 and result["data"]:
+            return {"code": 0, "data": result["data"][0]}
+        return {"code": 0, "data": None, "msg": "没有更多待标注样本"}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+@app.get("/api/annotation/stats")
+async def get_annotation_stats():
+    """
+    获取标注统计信息
+    """
+    try:
+        # 获取样本总数
+        sample_list = load_json_file(TOP_SAMPLES_PATH)
+        total_samples = len(sample_list) if sample_list else 0
+        
+        # 统计标注状态
+        annotated_count = 0
+        postponed_count = 0
+        unannotated_count = 0
+        
+        for sample in sample_list or []:
+            image_id = sample.get("img_name", "")
+            if not image_id:
+                continue
+            
+            anno_file = ANNOTATIONS_DIR / f"{image_id}.json"
+            anno_data = load_json_file(anno_file)
+            
+            if anno_data:
+                if anno_data.get("is_postponed"):
+                    postponed_count += 1
+                elif anno_data.get("is_annotated"):
+                    annotated_count += 1
+                else:
+                    unannotated_count += 1
+            else:
+                unannotated_count += 1
+        
+        # 计算进度
+        progress = (annotated_count + postponed_count) / max(total_samples, 1) * 100
+        
+        return {
+            "code": 0,
+            "data": {
+                "total_samples": total_samples,
+                "annotated_count": annotated_count,
+                "postponed_count": postponed_count,
+                "unannotated_count": unannotated_count,
+                "progress": round(progress, 2)
+            }
+        }
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/annotation/cluster-priority-queue")
+async def get_cluster_priority_queue(limit: int = 20, skip_labeled: bool = True):
+    """
+    获取字符聚类优先级队列（用于字符切割标注）
+    返回按优先级排序的待标注聚类列表
+    
+    优先级计算因素:
+    - 混乱度分数 (confusion_score): 聚类内字符多样性，越高越需要标注
+    - 聚类大小 (cluster_size): 越大越需要标注
+    - 是否已标注 (is_labeled): 未标注的优先级更高
+    """
+    try:
+        if not CLUSTERS_JSON.exists():
+            return {"code": 0, "data": [], "total": 0}
+        
+        clusters_data = load_json_file(CLUSTERS_JSON) or {}
+        labels_data = load_json_file(LABELS_JSON) or {}
+        
+        priority_items = []
+        
+        for cluster_id_str, cluster_info in clusters_data.items():
+            try:
+                cluster_id = int(cluster_id_str)
+            except ValueError:
+                continue
+            
+            cluster_size = len(cluster_info.get("sample_indices", []))
+            is_labeled = False
+            confusion_score = 0.0
+            char_count = 0
+            
+            # 检查是否已标注
+            if cluster_id_str in labels_data:
+                label_info = labels_data[cluster_id_str]
+                is_labeled = label_info.get("status") == "labeled"
+                char_labels = label_info.get("char_labels", {})
+                char_count = len([k for k, v in char_labels.items() if v.get("char")])
+            
+            # 计算混乱度（基于聚类内样本特征的方差或多样性）
+            # 简单实现：使用样本数量作为混乱度的一部分
+            confusion_score = min(cluster_size / 50, 1.0)
+            
+            # 优先级计算：混乱度(50%) + 聚类大小(30%) + 是否未标注(20%)
+            priority_score = confusion_score * 0.5 + (cluster_size / 100) * 0.3
+            if not is_labeled:
+                priority_score += 0.2
+            
+            if skip_labeled and is_labeled:
+                continue
+            
+            priority_items.append({
+                "cluster_id": cluster_id,
+                "cluster_size": cluster_size,
+                "is_labeled": is_labeled,
+                "confusion_score": round(confusion_score, 4),
+                "priority_score": round(priority_score, 4),
+                "char_count": char_count
+            })
+        
+        # 按优先级排序
+        priority_items.sort(key=lambda x: x["priority_score"], reverse=True)
+        
+        return {
+            "code": 0,
+            "data": priority_items[:limit],
+            "total": len(priority_items)
+        }
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/annotation/cluster-next")
+async def get_next_cluster():
+    """
+    获取下一个待标注聚类（最高优先级）
+    """
+    try:
+        result = await get_cluster_priority_queue(limit=1, skip_labeled=True)
+        if result["code"] == 0 and result["data"]:
+            return {"code": 0, "data": result["data"][0]}
+        return {"code": 0, "data": None, "msg": "没有更多待标注聚类"}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/annotation/cluster-stats")
+async def get_cluster_stats():
+    """
+    获取字符聚类标注统计信息
+    """
+    try:
+        if not CLUSTERS_JSON.exists():
+            return {"code": 0, "data": {"total_clusters": 0, "labeled_count": 0, "unlabeled_count": 0}}
+        
+        clusters_data = load_json_file(CLUSTERS_JSON) or {}
+        labels_data = load_json_file(LABELS_JSON) or {}
+        
+        total_clusters = len(clusters_data)
+        labeled_count = 0
+        unlabeled_count = 0
+        
+        for cluster_id in clusters_data.keys():
+            if cluster_id in labels_data and labels_data[cluster_id].get("status") == "labeled":
+                labeled_count += 1
+            else:
+                unlabeled_count += 1
+        
+        progress = labeled_count / max(total_clusters, 1) * 100
+        
+        return {
+            "code": 0,
+            "data": {
+                "total_clusters": total_clusters,
+                "labeled_count": labeled_count,
+                "unlabeled_count": unlabeled_count,
+                "progress": round(progress, 2)
+            }
+        }
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+# ======================================
+# 15. 迁移学习图片匹配API
 # ======================================
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -1495,7 +1867,6 @@ async def batch_label(request: BatchLabelRequest):
                         
                         all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
                         if all_chars:
-                            from collections import Counter
                             char_counts = Counter(all_chars)
                             most_common = char_counts.most_common(1)[0]
                             labels_data[cluster_id]["char"] = most_common[0]
@@ -1532,7 +1903,6 @@ async def batch_label(request: BatchLabelRequest):
                             
                             all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
                             if all_chars:
-                                from collections import Counter
                                 char_counts = Counter(all_chars)
                                 most_common = char_counts.most_common(1)[0]
                                 labels_data[cluster_id]["char"] = most_common[0]
@@ -1555,4 +1925,271 @@ async def batch_label(request: BatchLabelRequest):
         return {"code": 0, "count": labeled_count, "msg": f"成功标注 {labeled_count} 张图片"}
     except Exception as e:
         print(f"ERROR batch-label: {str(e)}")
+        return {"code": -1, "msg": str(e)}
+
+
+# ======================================
+# 从 routers/ 融合的独有功能
+# ======================================
+
+@app.get("/api/migration/feature-db")
+async def get_feature_db():
+    """获取特征数据库信息"""
+    try:
+        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
+        feature_db_path = data_dir / "char_features.json"
+        
+        if not feature_db_path.exists():
+            return {"code": -1, "msg": "特征数据库不存在"}
+        
+        with open(feature_db_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        char_count = len(data.get("features", {}))
+        return {"code": 0, "char_count": char_count, "data": data}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/migration/migration-map")
+async def get_migration_map():
+    """获取迁移学习映射表"""
+    try:
+        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
+        map_path = data_dir / "migration_map.json"
+        
+        if not map_path.exists():
+            return {"code": -1, "msg": "迁移映射不存在"}
+        
+        with open(map_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        return {"code": 0, "data": data}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.post("/api/migration/precompute")
+async def precompute_matches():
+    """预计算所有汉字的图片匹配（离线批处理）"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        migration_manager = MigrationManager()
+        result = migration_manager.precompute_all_image_matches(DATASET_ID)
+        return {"code": 0, "msg": "预计算完成", "matched_chars": len(result)}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.post("/api/migration/export-labels")
+async def export_labels_api(dataset_id: str = None, description: str = ""):
+    """导出标注结果"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        manager = MigrationManager()
+        target_id = dataset_id or DATASET_ID
+        export_path = manager.export_labels(target_id, description)
+        if export_path:
+            return {"code": 0, "msg": "导出成功", "export_path": export_path}
+        else:
+            return {"code": -1, "msg": "标注文件不存在"}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/migration/list-exports")
+async def list_exports_api():
+    """列出所有已导出的标注文件"""
+    try:
+        from bussiness.migration.sharing import LabelSharingManager
+        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
+        sharing_manager = LabelSharingManager(data_dir)
+        exports = sharing_manager.list_exported_files()
+        return {"code": 0, "data": exports}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+class ShareRequest(BaseModel):
+    source_dataset_id: str
+    target_dataset_ids: List[str]
+    merge_strategy: str = "merge"
+
+
+@app.post("/api/migration/share-labels")
+async def share_labels_api(request: ShareRequest):
+    """跨数据集共享标注"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        manager = MigrationManager()
+        result = manager.share_labels(request.source_dataset_id, request.target_dataset_ids, request.merge_strategy)
+        return result
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.post("/api/migration/import-labels")
+async def import_labels_api(file_path: str, target_dataset_id: str, merge_strategy: str = "merge"):
+    """导入标注结果"""
+    try:
+        from bussiness.migration.sharing import LabelSharingManager
+        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
+        sharing_manager = LabelSharingManager(data_dir)
+        result = sharing_manager.import_labels(file_path, target_dataset_id, merge_strategy)
+        return result
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.delete("/api/migration/delete-export/{filename}")
+async def delete_export_api(filename: str):
+    """删除已导出的标注文件"""
+    try:
+        from bussiness.migration.sharing import LabelSharingManager
+        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
+        sharing_manager = LabelSharingManager(data_dir)
+        success = sharing_manager.delete_exported_file(filename)
+        if success:
+            return {"code": 0, "msg": "删除成功"}
+        else:
+            return {"code": -1, "msg": "文件不存在"}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/migration/share-statistics")
+async def get_share_statistics_api():
+    """获取标注共享统计信息"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        manager = MigrationManager()
+        stats = manager.sharing_manager.get_share_statistics()
+        datasets = manager.get_all_datasets()
+        dataset_stats = [manager.get_dataset_label_stats(ds_id) for ds_id in datasets]
+        return {"code": 0, "data": {"share_stats": stats, "datasets": dataset_stats}}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/migration/datasets")
+async def get_datasets_api():
+    """获取所有数据集列表"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        manager = MigrationManager()
+        datasets = manager.get_all_datasets()
+        dataset_info = [manager.get_dataset_label_stats(ds_id) for ds_id in datasets]
+        return {"code": 0, "data": dataset_info}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/migration/dataset-stats/{dataset_id}")
+async def get_dataset_stats_api(dataset_id: str):
+    """获取指定数据集的标注统计"""
+    try:
+        from bussiness.migration.manager import MigrationManager
+        manager = MigrationManager()
+        stats = manager.get_dataset_label_stats(dataset_id)
+        return {"code": 0, "data": stats}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/char-images/search")
+async def search_char_images(char: str):
+    """搜索已标注的字符图片"""
+    try:
+        labeled_images = []
+        label_file = DATASET_DIR / "clusters" / "labeling" / "labels.json"
+        if label_file.exists():
+            with open(label_file, "r", encoding="utf-8") as f:
+                labels = json.load(f)
+            clusters_file = DATASET_DIR / "clusters" / "hog_clusters.json"
+            if clusters_file.exists():
+                with open(clusters_file, "r", encoding="utf-8") as f:
+                    clusters_data = json.load(f)
+            for cid, info in labels.items():
+                if info.get("status") == "labeled" and info.get("char_labels"):
+                    for char_idx, label_info in info["char_labels"].items():
+                        if label_info.get("char") == char:
+                            cluster_items = clusters_data.get("clusters", {}).get(str(cid), [])
+                            idx = int(char_idx)
+                            if idx < len(cluster_items):
+                                char_id = cluster_items[idx].get("char_id")
+                                if char_id:
+                                    labeled_images.append({
+                                        "filename": f"{char_id}.png",
+                                        "cluster_id": int(cid),
+                                        "char_index": idx
+                                    })
+        return {"code": 0, "images": labeled_images}
+    except Exception as e:
+        return {"code": -1, "msg": str(e)}
+
+
+@app.get("/api/line-status")
+async def get_line_status_api():
+    """获取行状态统计"""
+    try:
+        clusters_file = DATASET_DIR / "clusters" / "hog_clusters.json"
+        labels_file = DATASET_DIR / "clusters" / "labeling" / "labels.json"
+        if not clusters_file.exists() or not labels_file.exists():
+            return {"code": -1, "msg": "文件不存在"}
+        with open(clusters_file, "r", encoding="utf-8") as f:
+            clusters_data = json.load(f)
+        with open(labels_file, "r", encoding="utf-8") as f:
+            labels = json.load(f)
+        image_cluster_map = {}
+        image_label_map = {}
+        for cid, cluster_items in clusters_data.get("clusters", {}).items():
+            for idx, item in enumerate(cluster_items):
+                char_id = item.get("char_id")
+                if char_id:
+                    image_cluster_map[char_id] = {"cluster_id": int(cid), "char_index": idx}
+                    if cid in labels:
+                        label_info = labels[cid]
+                        if label_info.get("status") == "labeled" and label_info.get("char_labels"):
+                            if str(idx) in label_info["char_labels"]:
+                                image_label_map[char_id] = label_info["char_labels"][str(idx)].get("char")
+        line_data = {}
+        for cid, cluster_items in clusters_data.get("clusters", {}).items():
+            for item in cluster_items:
+                lineage = item.get("lineage", {})
+                line_name = lineage.get("line_name")
+                char_id = item.get("char_id")
+                char_index = lineage.get("char_idx", 0)
+                if line_name and char_id:
+                    if line_name not in line_data:
+                        line_data[line_name] = []
+                    labeled = char_id in image_label_map
+                    line_data[line_name].append({
+                        "char_id": char_id,
+                        "cluster_id": int(cid),
+                        "char": image_label_map.get(char_id),
+                        "labeled": labeled,
+                        "char_index": char_index
+                    })
+        result = []
+        for line_name, chars in line_data.items():
+            chars.sort(key=lambda x: x.get("char_index", 0))
+            total = len(chars)
+            labeled_count = sum(1 for c in chars if c["labeled"])
+            ratio = labeled_count / total if total > 0 else 0
+            status = "full" if ratio == 1 else "partial" if ratio > 0 else "unlabeled"
+            result.append({
+                "line_name": line_name,
+                "total": total,
+                "labeled": labeled_count,
+                "ratio": ratio,
+                "status": status,
+                "chars": chars
+            })
+        result.sort(key=lambda x: (
+            int(x["line_name"].split("_")[1].replace("page", "")) if len(x["line_name"].split("_")) > 1 else 0,
+            int(x["line_name"].split("_")[3]) if len(x["line_name"].split("_")) > 3 else 0
+        ))
+        return {"code": 0, "data": result}
+    except Exception as e:
+        print(f"获取行状态失败: {e}")
         return {"code": -1, "msg": str(e)}

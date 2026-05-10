@@ -47,5 +47,7 @@ GLOBAL_CHAR_REGISTRY_PATH = MIGRATION_DIR / "global_char_registry.json"
 # ======================================
 # Global Variables
 # ======================================
+PSEUDO_LABEL_CACHE_PATH = MIGRATION_DIR / "pseudo_label_cache.json"
+
 pseudo_label_cache = {}
 executor = ThreadPoolExecutor(max_workers=4)

@@ -263,39 +263,80 @@ const getImageUrl = (charId) => {
 }
 
 const showLineContext = async (img) => {
-  if (!img.lineage || !img.lineage.line_name) {
-    alert('无法获取行信息')
+  if (!img.lineage) {
+    alert('无法获取行信息：缺少血缘数据')
+    return
+  }
+
+  if (!img.lineage.line_name) {
+    alert('无法获取行信息：缺少行名称')
     return
   }
 
   const lineName = img.lineage.line_name
   const lineUrl = `/api/line-images/${encodeURIComponent(lineName)}`
 
-  const colStart = img.lineage.col_start || 0
-  const charWidth = img.lineage.width || 40
-  const cropWidth = 101
+  let charLeft = img.lineage.col_start
+  let charRight = undefined
+  
+  if (charLeft !== undefined && img.lineage.col_end !== undefined) {
+    charRight = img.lineage.col_end
+  } else if (charLeft !== undefined && img.lineage.width !== undefined) {
+    charRight = charLeft + img.lineage.width
+  }
+
+  const match = img.char_id.match(/page_(\d+)_line_(\d+)_char_(\d+)/)
+  const charIndex = match ? parseInt(match[3]) : 0
 
   try {
     const response = await fetch(lineUrl)
+    
+    if (!response.ok) {
+      alert(`无法获取行图片：HTTP ${response.status}`)
+      return
+    }
+    
     const blob = await response.blob()
     const bitmap = await createImageBitmap(blob)
+
+    if (charLeft === undefined) {
+      const avgCharWidth = Math.floor(bitmap.width / 30)
+      charLeft = charIndex * avgCharWidth
+      charRight = charLeft + avgCharWidth
+    }
+
+    const extend = 50
+    const cropLeft = Math.max(0, charLeft - extend)
+    const cropRight = Math.min(bitmap.width, charRight + extend)
+    const cropWidth = cropRight - cropLeft
 
     const canvas = document.createElement('canvas')
     canvas.width = cropWidth
     canvas.height = bitmap.height
     const ctx = canvas.getContext('2d')
 
-    const centerX = colStart + charWidth / 2
-    const srcX = Math.max(0, centerX - cropWidth / 2)
-    const srcWidth = Math.min(cropWidth, bitmap.width - srcX, cropWidth)
+    ctx.drawImage(bitmap, cropLeft, 0, cropWidth, bitmap.height, 0, 0, cropWidth, bitmap.height)
 
-    ctx.drawImage(bitmap, srcX, 0, srcWidth, bitmap.height, 0, 0, srcWidth, bitmap.height)
+    ctx.strokeStyle = 'red'
+    ctx.lineWidth = 2
+    
+    const leftLineX = charLeft - cropLeft
+    ctx.beginPath()
+    ctx.moveTo(leftLineX, 0)
+    ctx.lineTo(leftLineX, bitmap.height)
+    ctx.stroke()
+    
+    const rightLineX = charRight - cropLeft
+    ctx.beginPath()
+    ctx.moveTo(rightLineX, 0)
+    ctx.lineTo(rightLineX, bitmap.height)
+    ctx.stroke()
 
     lineContextImage.value = canvas.toDataURL('image/png')
     showLineModal.value = true
   } catch (err) {
     console.error('加载行图片失败:', err)
-    alert('加载行图片失败')
+    alert(`加载行图片失败：${err.message}`)
   }
 }
 

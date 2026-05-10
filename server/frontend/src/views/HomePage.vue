@@ -98,6 +98,7 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -105,6 +106,9 @@ const router = useRouter()
 const goTo = (path) => {
   router.push(path)
 }
+
+onMounted(() => {
+})
 </script>
 
 <style scoped>
@@ -116,7 +120,7 @@ const goTo = (path) => {
 
 .header {
   text-align: center;
-  margin-bottom: 50px;
+  margin-bottom: 30px;
 }
 
 .title {
@@ -131,6 +135,7 @@ const goTo = (path) => {
   color: #666;
 }
 
+/* Feature Grid */
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -195,6 +200,10 @@ const goTo = (path) => {
 }
 
 @media (max-width: 768px) {
+  .home-container {
+    padding: 20px;
+  }
+
   .feature-grid {
     grid-template-columns: 1fr;
   }
