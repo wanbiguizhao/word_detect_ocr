@@ -183,3 +183,8 @@ filtered_chars/*
 bussiness/datahome
 ocr_system/data
 bussiness/migration/data/char_feature_db.json
+bussiness/migration/data/
+pdf01_evaluation_results.json
+ocr_system.tar
+bussiness/migration/data/char_priority_list.json
+val_rel_stats.json
