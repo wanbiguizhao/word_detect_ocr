@@ -3,7 +3,7 @@ import time
 from collections import Counter
 from fastapi import APIRouter, HTTPException, Request
 from sklearn.metrics.pairwise import cosine_similarity
-from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, pseudo_label_cache, executor
+from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, SOURCE_DATASET_ID, pseudo_label_cache, executor
 from utils import load_json_file, extract_hog_features, get_labeled_clusters_info
 
 router = APIRouter()
@@ -118,7 +118,7 @@ def compute_pseudo_clusters_sync(char):
 
         anchor_features = {}
         for item in anchor_char_ids:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{item["char_id"]}.png')
+            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f'{item["char_id"]}.png')
             feat = extract_hog_features(img_path)
             if feat is not None:
                 anchor_features[item["char_id"]] = feat
@@ -149,7 +149,7 @@ def compute_pseudo_clusters_sync(char):
 
             for idx, char_info in unlabeled_indices[:20]:
                 char_id = char_info.get("char_id", "")
-                img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+                img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f'{char_id}.png')
                 target_feat = extract_hog_features(img_path)
                 if target_feat is None:
                     continue
@@ -235,7 +235,7 @@ async def get_pseudo_label_cluster_images(request: Request):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f'{char_id}.png')
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -253,7 +253,7 @@ async def get_pseudo_label_cluster_images(request: Request):
             continue
 
         char_id = char_info.get("char_id", "")
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f'{char_id}.png')
+        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f'{char_id}.png')
         target_feat = extract_hog_features(img_path)
         if target_feat is None:
             continue

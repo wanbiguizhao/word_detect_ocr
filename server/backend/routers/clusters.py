@@ -3,7 +3,7 @@ import json
 from collections import Counter
 from fastapi import APIRouter, HTTPException
 from sklearn.metrics.pairwise import cosine_similarity
-from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, pseudo_label_cache
+from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, SOURCE_DATASET_ID, pseudo_label_cache, DATASET_DIR
 from models import BatchLabelSave, ClusterLabelSave
 from utils import load_json_file, extract_hog_features, get_labeled_clusters_info
 
@@ -16,10 +16,34 @@ def get_clusters():
         raise HTTPException(status_code=404, detail="聚类数据不存在")
 
     data = load_json_file(CLUSTERS_JSON)
+    clusters = data.get("clusters", {})
+    
+    # 读取已确认的标注
+    unified_labels_path = DATASET_DIR / "unified_labels.json"
+    if not unified_labels_path.exists():
+        unified_labels_path = PROJECT_ROOT / "bussiness" / "unified_labels.json"
+    
+    confirmed_annotations = {}
+    if unified_labels_path.exists():
+        with open(unified_labels_path, 'r', encoding='utf-8') as f:
+            unified_data = json.load(f)
+        
+        for ann in unified_data.get("annotations", []):
+            if ann.get("char_id") and ann.get("char"):
+                confirmed_annotations[ann["char_id"]] = ann["char"]
+    
+    # 将已确认的标注合并到聚类数据中
+    for cluster_id, chars in clusters.items():
+        for char in chars:
+            char_id = char.get("char_id")
+            if char_id in confirmed_annotations:
+                char["confirmed_char"] = confirmed_annotations[char_id]
+                char["confirmed"] = True
+    
     return {
         "code": 0,
         "msg": "success",
-        "clusters": data.get("clusters", {}),
+        "clusters": clusters,
         "config": data.get("config", {})
     }
 
@@ -87,6 +111,68 @@ def save_cluster_label(body: ClusterLabelSave):
     with open(LABELS_JSON, "w", encoding="utf-8") as f:
         json.dump(labels_data, f, ensure_ascii=False, indent=2)
 
+    # 同步到统一标注
+    if body.char is not None and body.charIndex is not None:
+        print(f"[DEBUG] 开始同步到统一标注: cluster={cluster_key}, charIndex={body.charIndex}, char={body.char}")
+        
+        # 从聚类数据获取 char_id
+        char_id = None
+        if CLUSTERS_JSON.exists():
+            clusters_data = load_json_file(CLUSTERS_JSON)
+            cluster_chars = clusters_data.get("clusters", {}).get(cluster_key, [])
+            if cluster_chars:
+                print(f"[DEBUG] 聚类{cluster_key}有{len(cluster_chars)}个字符")
+                if int(body.charIndex) < len(cluster_chars):
+                    char_id = cluster_chars[int(body.charIndex)].get("char_id")
+                    print(f"[DEBUG] 获取到char_id: {char_id}")
+                else:
+                    print(f"[DEBUG] charIndex {body.charIndex}超出范围")
+            else:
+                print(f"[DEBUG] 聚类{cluster_key}没有字符数据")
+        else:
+            print(f"[DEBUG] 聚类数据文件不存在: {CLUSTERS_JSON}")
+        
+        if char_id:
+            unified_labels_path = DATASET_DIR / "unified_labels.json"
+            print(f"[DEBUG] 统一标注路径: {unified_labels_path}")
+            
+            if unified_labels_path.exists():
+                with open(unified_labels_path, 'r', encoding='utf-8') as f:
+                    unified_data = json.load(f)
+                print(f"[DEBUG] 统一标注已存在，当前有{len(unified_data.get('annotations', []))}条记录")
+            else:
+                unified_data = {"annotations": []}
+                print(f"[DEBUG] 统一标注不存在，创建新文件")
+            
+            # 更新或添加标注
+            annotations = unified_data.get("annotations", [])
+            found = False
+            for ann in annotations:
+                if ann.get("char_id") == char_id:
+                    ann["char"] = body.char
+                    ann["status"] = "labeled"
+                    ann["updated_at"] = datetime.datetime.now().isoformat()
+                    found = True
+                    print(f"[DEBUG] 更新已存在的标注: {char_id} -> {body.char}")
+                    break
+            
+            if not found:
+                annotations.append({
+                    "char_id": char_id,
+                    "char": body.char,
+                    "status": "labeled",
+                    "created_at": datetime.datetime.now().isoformat(),
+                    "updated_at": datetime.datetime.now().isoformat()
+                })
+                print(f"[DEBUG] 添加新标注: {char_id} -> {body.char}")
+            
+            unified_data["annotations"] = annotations
+            with open(unified_labels_path, 'w', encoding='utf-8') as f:
+                json.dump(unified_data, f, ensure_ascii=False, indent=2)
+            print(f"[DEBUG] 同步完成，统一标注现在有{len(annotations)}条记录")
+        else:
+            print(f"[DEBUG] 未能获取char_id，跳过同步")
+
     return {"code": 0, "msg": "保存成功"}
 
 
@@ -145,7 +231,49 @@ def batch_save_cluster_labels(body: BatchLabelSave):
     with open(LABELS_JSON, "w", encoding="utf-8") as f:
         json.dump(labels_data, f, ensure_ascii=False, indent=2)
 
+    # 同步到统一标注
     cluster_id = str(body.clusterId)
+    if CLUSTERS_JSON.exists():
+        clusters_data = load_json_file(CLUSTERS_JSON)
+        cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
+        
+        unified_labels_path = DATASET_DIR / "unified_labels.json"
+        if unified_labels_path.exists():
+            with open(unified_labels_path, 'r', encoding='utf-8') as f:
+                unified_data = json.load(f)
+        else:
+            unified_data = {"annotations": []}
+        
+        annotations = unified_data.get("annotations", [])
+        
+        for item in body.labels:
+            char_index = int(item.charIndex)
+            if char_index < len(cluster_chars):
+                char_id = cluster_chars[char_index].get("char_id")
+                if char_id:
+                    # 更新或添加标注
+                    found = False
+                    for ann in annotations:
+                        if ann.get("char_id") == char_id:
+                            ann["char"] = item.char
+                            ann["status"] = "labeled"
+                            ann["updated_at"] = datetime.datetime.now().isoformat()
+                            found = True
+                            break
+                    
+                    if not found:
+                        annotations.append({
+                            "char_id": char_id,
+                            "char": item.char,
+                            "status": "labeled",
+                            "created_at": datetime.datetime.now().isoformat(),
+                            "updated_at": datetime.datetime.now().isoformat()
+                        })
+        
+        unified_data["annotations"] = annotations
+        with open(unified_labels_path, 'w', encoding='utf-8') as f:
+            json.dump(unified_data, f, ensure_ascii=False, indent=2)
+
     for item in body.labels:
         char = item.char
         if char in pseudo_label_cache:
@@ -306,7 +434,7 @@ def get_cluster_recommend(cluster_id: int, mode: str = "global"):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f"{char_id}.png")
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -339,7 +467,7 @@ def get_cluster_recommend(cluster_id: int, mode: str = "global"):
         char_id = char_info.get("char_id", "")
         img_path = char_info.get("image_path", "")
         if not img_path:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f"{char_id}.png")
 
         target_feat = extract_hog_features(img_path)
         if target_feat is None:
@@ -417,7 +545,7 @@ def get_recommend_images(cluster_id: int, char: str):
 
     anchor_features = {}
     for char_id in anchor_char_ids:
-        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+        img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f"{char_id}.png")
         feat = extract_hog_features(img_path)
         if feat is not None:
             anchor_features[char_id] = feat
@@ -434,7 +562,7 @@ def get_recommend_images(cluster_id: int, char: str):
         char_id = char_info.get("char_id", "")
         img_path = char_info.get("image_path", "")
         if not img_path:
-            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars" / f"{char_id}.png")
+            img_path = str(PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars" / f"{char_id}.png")
 
         target_feat = extract_hog_features(img_path)
         if target_feat is None:

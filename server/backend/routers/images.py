@@ -2,7 +2,7 @@ import json
 import datetime
 from fastapi import APIRouter, HTTPException, Request, Response
 from pathlib import Path
-from config import RAW_IMAGES_DIR, ANNOTATIONS_DIR, TOP_SAMPLES_PATH, RULE_JSONS_DIR, MODEL_JSONS_DIR, FUSION_JSONS_DIR
+from config import RAW_IMAGES_DIR, ANNOTATIONS_DIR, TOP_SAMPLES_PATH, RULE_JSONS_DIR, MODEL_JSONS_DIR, FUSION_JSONS_DIR, SOURCE_DATASET_ID, PROJECT_ROOT
 from models import AnnotationSubmit, BatchLabelSave
 from utils import load_json_file, chars_to_lines, lines_to_chars, get_image_width
 
@@ -168,12 +168,15 @@ async def get_raw(image_id: str):
 async def get_char_image(image_name: str):
     from config import PROJECT_ROOT, DATASET_DIR
     
+    # FastAPI会自动URL解码，所以这里需要处理解码后的路径
+    # 统一使用正斜杠路径
+    image_path = image_name.replace("\\", "/")
+    
     # 提取纯文件名（去掉路径和扩展名）
-    filename = image_name
-    if "\\" in filename:
-        filename = filename.split("\\")[-1]
-    elif "/" in filename:
-        filename = filename.split("/")[-1]
+    if "/" in image_path:
+        filename = image_path.split("/")[-1]
+    else:
+        filename = image_path
     
     # 去掉扩展名
     base_name = filename
@@ -182,8 +185,30 @@ async def get_char_image(image_name: str):
             base_name = base_name[:-len(ext)]
             break
     
-    # 1. 首先尝试完整路径（处理聚类数据中的绝对路径）
-    if "\\" in image_name or ("/" in image_name and len(image_name) > 20):
+    # 1. 尝试相对路径（从bussiness目录开始）
+    relative_path = PROJECT_ROOT / "bussiness" / image_path
+    print(f"[DEBUG] Trying path: {relative_path}")
+    if relative_path.exists():
+        with open(relative_path, "rb") as f:
+            content = f.read()
+        response = Response(content)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Content-Type"] = "image/png"
+        return response
+    
+    # 2. 尝试不带扩展名的相对路径
+    for ext in [".png", ".jpg", ".jpeg"]:
+        relative_path_with_ext = PROJECT_ROOT / "bussiness" / f"{image_path}{ext}"
+        if relative_path_with_ext.exists():
+            with open(relative_path_with_ext, "rb") as f:
+                content = f.read()
+            response = Response(content)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Content-Type"] = "image/png"
+            return response
+    
+    # 3. 尝试完整路径（处理绝对路径）
+    if "\\" in image_name or len(image_name) > 50:
         full_path = Path(image_name)
         if full_path.exists():
             with open(full_path, "rb") as f:
@@ -192,25 +217,16 @@ async def get_char_image(image_name: str):
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Content-Type"] = "image/png"
             return response
-        
-        for ext in [".png", ".jpg", ".jpeg"]:
-            if not image_name.lower().endswith(ext):
-                full_path_with_ext = Path(f"{image_name}{ext}")
-                if full_path_with_ext.exists():
-                    with open(full_path_with_ext, "rb") as f:
-                        content = f.read()
-                    response = Response(content)
-                    response.headers["Access-Control-Allow-Origin"] = "*"
-                    response.headers["Content-Type"] = "image/png"
-                    return response
     
-    # 2. 尝试多个可能的字符图片目录
+    # 4. 尝试多个可能的字符图片目录
     possible_dirs = [
         DATASET_DIR / "pdf_chars",
-        PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823" / "pdf_chars",
         DATASET_DIR / "clusters" / "char_images",
         DATASET_DIR,
-        PROJECT_ROOT / "bussiness" / "datahome" / "pdf01",
+        PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID,
+        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823",
     ]
 
     for char_dir in possible_dirs:
@@ -288,8 +304,7 @@ async def get_char_image(image_name: str):
 
 @router.get("/api/line-images/{line_path:path}")
 async def get_line_image(line_path: str):
-    from config import PROJECT_ROOT
-    line_dir = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "pdf_lines"
+    line_dir = PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_lines"
     line_file = line_dir / f"{line_path}.png"
 
     if not line_file.exists():
@@ -302,3 +317,29 @@ async def get_line_image(line_path: str):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Content-Type"] = "image/png"
     return response
+
+
+@router.get("/api/image/pdf_chars/{char_id}")
+async def get_char_image_from_pdf_chars(char_id: str):
+    """获取PDF字符图片（支持多轮聚类页面）"""
+    from config import DATASET_DIR
+    
+    # 尝试多个可能的字符图片目录
+    possible_dirs = [
+        DATASET_DIR / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823" / "pdf_chars",
+    ]
+
+    for char_dir in possible_dirs:
+        for ext in [".png", ".jpg", ".jpeg"]:
+            img_file = char_dir / f"{char_id}{ext}"
+            if img_file.exists():
+                with open(img_file, "rb") as f:
+                    content = f.read()
+                response = Response(content)
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                response.headers["Content-Type"] = "image/png"
+                return response
+
+    raise HTTPException(status_code=404, detail=f"字符图片不存在: {char_id}")

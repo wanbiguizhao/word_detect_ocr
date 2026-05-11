@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter
-from config import PROJECT_ROOT
+from config import PROJECT_ROOT, SOURCE_DATASET_ID
 
 router = APIRouter()
 
@@ -9,12 +9,12 @@ router = APIRouter()
 async def get_char_images_list(char: str):
     try:
         labeled_images = []
-        label_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "labeling" / "labels.json"
+        label_file = PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "clusters" / "labeling" / "labels.json"
         if label_file.exists():
             with open(label_file, "r", encoding="utf-8") as f:
                 labels = json.load(f)
 
-            clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "hog_clusters.json"
+            clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "clusters" / "hog_clusters.json"
             if clusters_file.exists():
                 with open(clusters_file, "r", encoding="utf-8") as f:
                     clusters_data = json.load(f)
@@ -43,8 +43,8 @@ async def get_char_images_list(char: str):
 @router.get("/api/line-status")
 async def get_line_status():
     try:
-        clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "hog_clusters.json"
-        labels_file = PROJECT_ROOT / "bussiness" / "datahome" / "pdf01" / "clusters" / "labeling" / "labels.json"
+        clusters_file = PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "clusters" / "hog_clusters.json"
+        labels_file = PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "clusters" / "labeling" / "labels.json"
 
         if not clusters_file.exists() or not labels_file.exists():
             return {"code": -1, "msg": "文件不存在"}

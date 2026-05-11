@@ -17,6 +17,7 @@ from collections import defaultdict, Counter
 # 从 config.py 导入配置
 # ======================================
 from config import (
+    PROJECT_ROOT,
     DATASET_ID,
     DATASET_DIR,
     DATAHOME_DIR,
@@ -50,7 +51,10 @@ app.add_middleware(
 @app.middleware("http")
 async def set_encoding(request: Request, call_next):
     response = await call_next(request)
-    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    # 只在响应不是图片时设置Content-Type
+    content_type = response.headers.get("Content-Type", "")
+    if not content_type.startswith("image/"):
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
 
 # ======================================
@@ -306,86 +310,8 @@ class BatchLabelSave(BaseModel):
     labels: List[BatchLabelItem]
 
 
-@app.post("/api/cluster-labels/batch-save")
-def batch_save_cluster_labels(body: BatchLabelSave):
-    LABELS_JSON.parent.mkdir(parents=True, exist_ok=True)
-
-    if LABELS_JSON.exists():
-        labels_data = load_json_file(LABELS_JSON) or {}
-    else:
-        labels_data = {}
-
-    cluster_key = str(body.clusterId)
-
-    if cluster_key not in labels_data:
-        labels_data[cluster_key] = {
-            "char": None,
-            "chars": {},
-            "status": "unlabeled",
-            "confidence": None,
-            "alias": "",
-            "char_labels": {}
-        }
-
-    if "char_labels" not in labels_data[cluster_key]:
-        labels_data[cluster_key]["char_labels"] = {}
-
-    existing_chars = set()
-    for cluster_data in labels_data.values():
-        if cluster_data.get("status") == "labeled" and cluster_data.get("char_labels"):
-            for label_info in cluster_data["char_labels"].values():
-                if label_info.get("char"):
-                    existing_chars.add(label_info["char"])
-
-    new_chars = set()
-
-    for item in body.labels:
-        char_key = str(item.charIndex)
-        labels_data[cluster_key]["char_labels"][char_key] = {
-            "char": item.char,
-            "labeled_at": datetime.datetime.now().isoformat()
-        }
-        
-        if item.char not in existing_chars:
-            new_chars.add(item.char)
-
-    all_chars = [v["char"] for v in labels_data[cluster_key]["char_labels"].values() if v.get("char")]
-    if all_chars:
-        char_counts = Counter(all_chars)
-        most_common = char_counts.most_common(1)[0]
-        labels_data[cluster_key]["char"] = most_common[0]
-        labels_data[cluster_key]["confidence"] = most_common[1] / len(all_chars)
-        labels_data[cluster_key]["chars"] = dict(char_counts)
-        labels_data[cluster_key]["status"] = "labeled"
-
-    with open(LABELS_JSON, "w", encoding="utf-8") as f:
-        json.dump(labels_data, f, ensure_ascii=False, indent=2)
-
-    cluster_id = str(body.clusterId)
-    for item in body.labels:
-        char = item.char
-        if char in pseudo_label_cache:
-            if cluster_id in pseudo_label_cache[char]:
-                before_count = len(pseudo_label_cache[char])
-                del pseudo_label_cache[char][cluster_id]
-                after_count = len(pseudo_label_cache[char]) if char in pseudo_label_cache else 0
-                if len(pseudo_label_cache[char]) == 0:
-                    del pseudo_label_cache[char]
-            else:
-                pass
-        else:
-            pass
-
-    new_chars_list = sorted(list(new_chars))
-    return {
-        "code": 0, 
-        "msg": f"保存成功，共 {len(body.labels)} 条",
-        "new_chars_count": len(new_chars_list),
-        "new_chars": new_chars_list
-    }
-
 # ======================================
-# 3.1 暂不标注接口
+# 3.1 暂不标注接口（cluster-labels路由已迁移到routers/clusters.py）
 # ======================================
 @app.post("/api/images/{image_id:path}/postpone")
 async def postpone_anno(image_id: str):
@@ -503,65 +429,7 @@ def get_cluster_labels():
 
 
 # ======================================
-# 7. 保存聚类标注
-# ======================================
-class ClusterLabelSave(BaseModel):
-    clusterId: int
-    alias: Optional[str] = None
-    char: Optional[str] = None
-    charIndex: Optional[int] = None
-
-@app.post("/api/cluster-labels/save")
-def save_cluster_label(body: ClusterLabelSave):
-    LABELS_JSON.parent.mkdir(parents=True, exist_ok=True)
-
-    if LABELS_JSON.exists():
-        labels_data = load_json_file(LABELS_JSON) or {}
-    else:
-        labels_data = {}
-
-    cluster_key = str(body.clusterId)
-
-    if cluster_key not in labels_data:
-        labels_data[cluster_key] = {
-            "char": None,
-            "chars": {},
-            "status": "unlabeled",
-            "confidence": None,
-            "alias": "",
-            "char_labels": {}
-        }
-
-    if body.alias is not None:
-        labels_data[cluster_key]["alias"] = body.alias
-
-    if body.char is not None and body.charIndex is not None:
-        char_key = str(body.charIndex)
-        if "char_labels" not in labels_data[cluster_key]:
-            labels_data[cluster_key]["char_labels"] = {}
-        labels_data[cluster_key]["char_labels"][char_key] = {
-            "char": body.char,
-            "labeled_at": datetime.datetime.now().isoformat()
-        }
-
-        all_chars = [v["char"] for v in labels_data[cluster_key]["char_labels"].values()]
-        if all_chars:
-            char_counts = Counter(all_chars)
-            most_common = char_counts.most_common(1)[0]
-            labels_data[cluster_key]["char"] = most_common[0]
-            labels_data[cluster_key]["confidence"] = most_common[1] / len(all_chars)
-            labels_data[cluster_key]["chars"] = dict(char_counts)
-
-        labels_data[cluster_key]["status"] = "labeled"
-    
-    with open(LABELS_JSON, "w", encoding="utf-8") as f:
-        json.dump(labels_data, f, ensure_ascii=False, indent=2)
-    
-    return {"code": 0, "msg": "保存成功"}
-
-
-# ======================================
-# 8. 标记聚类为暂不标记
+# 8. 标记聚类为暂不标记（cluster-labels/save已迁移到routers/clusters.py）
 # ======================================
 @app.post("/api/clusters/{cluster_id}/skip")
 def skip_cluster(cluster_id: int):
@@ -1256,7 +1124,31 @@ async def get_char_images_list(char: str):
 # ======================================
 @app.get("/api/char-images/{image_name:path}")
 async def get_char_image(image_name: str, dataset: str = None):
-    # 优先使用请求参数，否则使用配置文件中的数据集
+    # 统一使用正斜杠路径
+    image_path = image_name.replace("\\", "/")
+    
+    # 1. 首先尝试相对路径（从bussiness目录开始）
+    relative_path = PROJECT_ROOT / "bussiness" / image_path
+    if relative_path.exists():
+        with open(relative_path, "rb") as f:
+            content = f.read()
+        response = Response(content)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Content-Type"] = "image/png"
+        return response
+    
+    # 2. 尝试不带扩展名的相对路径
+    for ext in [".png", ".jpg", ".jpeg"]:
+        relative_path_with_ext = PROJECT_ROOT / "bussiness" / f"{image_path}{ext}"
+        if relative_path_with_ext.exists():
+            with open(relative_path_with_ext, "rb") as f:
+                content = f.read()
+            response = Response(content)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Content-Type"] = "image/png"
+            return response
+    
+    # 3. 尝试数据集目录（原来的逻辑）
     target_dataset_id = dataset or DATASET_ID
     char_dir = DATAHOME_DIR / target_dataset_id / "pdf_chars"
     
@@ -1396,106 +1288,7 @@ from config import (
     GLOBAL_CHAR_REGISTRY_PATH
 )
 
-@app.get("/api/migration/feature-db")
-async def get_char_feature_db():
-    """获取汉字特征库"""
-    try:
-        data = load_json_file(CHAR_FEATURE_DB_PATH)
-        if data is None:
-            return {"code": -1, "msg": "文件不存在"}
-        return {"code": 0, "data": data}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
 
-@app.get("/api/migration/migration-map")
-async def get_migration_map():
-    """获取迁移映射表"""
-    try:
-        data = load_json_file(CHAR_MIGRATION_MAP_PATH)
-        if data is None:
-            return {"code": -1, "msg": "文件不存在"}
-        return {"code": 0, "data": data}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-@app.get("/api/migration/priority-list")
-async def get_priority_list(keyword: str = None):
-    """获取标注优先级列表"""
-    try:
-        data = load_json_file(CHAR_PRIORITY_LIST_PATH)
-        if data is None:
-            return {"code": -1, "msg": "文件不存在"}
-        
-        # 获取已标注的字符统计
-        labeled_counts = get_labeled_char_counts()
-        
-        # 从priorities数组中提取数据
-        priorities = data.get("priorities", [])
-        
-        # 添加已标注数量
-        result = []
-        for item in priorities:
-            char = item.get("char", "")
-            labeled_count = labeled_counts.get(char, 0)
-            result.append({
-                **item,
-                "labeled_count": labeled_count
-            })
-        
-        # 如果有搜索关键词，进行过滤
-        if keyword:
-            result = [item for item in result if keyword in item.get("char", "")]
-        
-        return {"code": 0, "data": result}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-def get_labeled_char_counts() -> dict:
-    """获取已标注字符的统计"""
-    labeled_counts = {}
-    
-    from config import LABELS_JSON
-    labels_data = load_json_file(LABELS_JSON) or {}
-    
-    for cluster_id, label_info in labels_data.items():
-        char_labels = label_info.get("char_labels", {})
-        for idx, label_data in char_labels.items():
-            char = label_data.get("char", "")
-            if char:
-                labeled_counts[char] = labeled_counts.get(char, 0) + 1
-    
-    return labeled_counts
-
-@app.get("/api/migration/registry")
-async def get_global_registry():
-    """获取全局汉字注册表"""
-    try:
-        data = load_json_file(GLOBAL_CHAR_REGISTRY_PATH)
-        if data is None:
-            return {"code": -1, "msg": "文件不存在"}
-        return {"code": 0, "data": data}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-@app.get("/api/migration/recommend-chars")
-async def get_recommend_chars(top_n: int = 20):
-    """获取推荐标注的汉字列表"""
-    try:
-        data = load_json_file(CHAR_PRIORITY_LIST_PATH)
-        if data is None:
-            return {"code": -1, "msg": "优先级列表不存在"}
-        
-        priorities = data.get("priorities", [])
-        recommend_chars = [
-            item for item in priorities 
-            if item["action"] == "优先标注" or item["target_count"] == 0
-        ]
-        
-        recommend_chars.sort(key=lambda x: x["priority_score"], reverse=True)
-        
-        return {"code": 0, "data": recommend_chars[:top_n]}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
 
 
 # ======================================
@@ -1778,324 +1571,6 @@ async def get_cluster_stats():
         return {"code": -1, "msg": str(e)}
 
 
-# ======================================
-# 15. 迁移学习图片匹配API
-# ======================================
-import sys
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-from bussiness.migration.manager import MigrationManager
-
-migration_manager = MigrationManager()
-
-@app.get("/api/migration/image-matches/{char}")
-async def get_image_matches(char: str, top_n: int = 20):
-    """获取指定汉字在目标数据集中的匹配图片"""
-    try:
-        target_dataset_id = DATASET_ID
-        confirmed, pending = migration_manager.find_image_matches(target_dataset_id, char, top_n)
-        all_matches = confirmed + pending
-        return {"code": 0, "matches": all_matches}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-class BatchLabelRequest(BaseModel):
-    char: str
-    charIds: List[str]
-
-
-@app.post("/api/migration/batch-label")
-async def batch_label(request: BatchLabelRequest):
-    """批量标注图片为指定汉字"""
-    try:
-        char = request.char
-        char_ids = request.charIds
-        
-        print(f"DEBUG batch-label: char={char}, charIds={char_ids}")
-        
-        if not char or not char_ids:
-            return {"code": -1, "msg": "参数错误"}
-        
-        labels_data = load_json_file(LABELS_JSON) or {}
-        clusters_data = load_json_file(CLUSTERS_JSON) or {}
-        clusters = clusters_data.get("clusters", {})
-        
-        print(f"DEBUG batch-label: 加载到 {len(clusters)} 个聚类")
-        
-        labeled_count = 0
-        
-        for char_id in char_ids:
-            found = False
-            
-            # 尝试两种匹配方式：
-            # 1. 直接匹配完整的 char_id（如 'page_10_line_10_char_0'）
-            # 2. 解析 clusterId_index 格式（如 '754_7'）
-            parsed_cluster_id = None
-            parsed_idx = None
-            
-            # 尝试解析 clusterId_index 格式
-            if '_' in char_id:
-                parts = char_id.split('_')
-                if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
-                    parsed_cluster_id = parts[0]
-                    parsed_idx = int(parts[1])
-            
-            for cluster_id, cluster_chars in clusters.items():
-                # 如果解析成功，直接定位到指定聚类和索引
-                if parsed_cluster_id is not None and parsed_idx is not None and cluster_id == parsed_cluster_id:
-                    if parsed_idx < len(cluster_chars):
-                        print(f"DEBUG batch-label: 通过 clusterId_index 匹配: char_id={char_id}, cluster_id={cluster_id}, idx={parsed_idx}")
-                        # 确保聚类数据结构完整
-                        if cluster_id not in labels_data:
-                            labels_data[cluster_id] = {
-                                "char": None,
-                                "chars": {},
-                                "status": "unlabeled",
-                                "confidence": None,
-                                "alias": "",
-                                "char_labels": {}
-                            }
-                        # 确保 char_labels 字段存在
-                        if "char_labels" not in labels_data[cluster_id]:
-                            labels_data[cluster_id]["char_labels"] = {}
-                        
-                        labels_data[cluster_id]["char_labels"][str(parsed_idx)] = {
-                            "char": char,
-                            "labeled_at": datetime.datetime.now().isoformat()
-                        }
-                        
-                        all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
-                        if all_chars:
-                            char_counts = Counter(all_chars)
-                            most_common = char_counts.most_common(1)[0]
-                            labels_data[cluster_id]["char"] = most_common[0]
-                            labels_data[cluster_id]["confidence"] = most_common[1] / len(all_chars)
-                            labels_data[cluster_id]["chars"] = dict(char_counts)
-                            labels_data[cluster_id]["status"] = "labeled"
-                        
-                        labeled_count += 1
-                        found = True
-                        break
-                else:
-                    # 传统方式：遍历查找完整匹配的 char_id
-                    for idx, char_info in enumerate(cluster_chars):
-                        if char_info.get("char_id") == char_id:
-                            print(f"DEBUG batch-label: 通过完整 char_id 匹配: char_id={char_id}, cluster_id={cluster_id}, idx={idx}")
-                            # 确保聚类数据结构完整
-                            if cluster_id not in labels_data:
-                                labels_data[cluster_id] = {
-                                    "char": None,
-                                    "chars": {},
-                                    "status": "unlabeled",
-                                    "confidence": None,
-                                    "alias": "",
-                                    "char_labels": {}
-                                }
-                            # 确保 char_labels 字段存在
-                            if "char_labels" not in labels_data[cluster_id]:
-                                labels_data[cluster_id]["char_labels"] = {}
-                            
-                            labels_data[cluster_id]["char_labels"][str(idx)] = {
-                                "char": char,
-                                "labeled_at": datetime.datetime.now().isoformat()
-                            }
-                            
-                            all_chars = [v["char"] for v in labels_data[cluster_id]["char_labels"].values() if v.get("char")]
-                            if all_chars:
-                                char_counts = Counter(all_chars)
-                                most_common = char_counts.most_common(1)[0]
-                                labels_data[cluster_id]["char"] = most_common[0]
-                                labels_data[cluster_id]["confidence"] = most_common[1] / len(all_chars)
-                                labels_data[cluster_id]["chars"] = dict(char_counts)
-                                labels_data[cluster_id]["status"] = "labeled"
-                            
-                            labeled_count += 1
-                            found = True
-                            break
-                if found:
-                    break
-        
-        print(f"DEBUG batch-label: 标注完成，共标注 {labeled_count} 张图片")
-        print(f"DEBUG batch-label: LABELS_JSON 路径: {LABELS_JSON}")
-        
-        with open(LABELS_JSON, "w", encoding="utf-8") as f:
-            json.dump(labels_data, f, ensure_ascii=False, indent=2)
-        
-        return {"code": 0, "count": labeled_count, "msg": f"成功标注 {labeled_count} 张图片"}
-    except Exception as e:
-        print(f"ERROR batch-label: {str(e)}")
-        return {"code": -1, "msg": str(e)}
-
-
-# ======================================
-# 从 routers/ 融合的独有功能
-# ======================================
-
-@app.get("/api/migration/feature-db")
-async def get_feature_db():
-    """获取特征数据库信息"""
-    try:
-        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
-        feature_db_path = data_dir / "char_features.json"
-        
-        if not feature_db_path.exists():
-            return {"code": -1, "msg": "特征数据库不存在"}
-        
-        with open(feature_db_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        char_count = len(data.get("features", {}))
-        return {"code": 0, "char_count": char_count, "data": data}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.get("/api/migration/migration-map")
-async def get_migration_map():
-    """获取迁移学习映射表"""
-    try:
-        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
-        map_path = data_dir / "migration_map.json"
-        
-        if not map_path.exists():
-            return {"code": -1, "msg": "迁移映射不存在"}
-        
-        with open(map_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        return {"code": 0, "data": data}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.post("/api/migration/precompute")
-async def precompute_matches():
-    """预计算所有汉字的图片匹配（离线批处理）"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        migration_manager = MigrationManager()
-        result = migration_manager.precompute_all_image_matches(DATASET_ID)
-        return {"code": 0, "msg": "预计算完成", "matched_chars": len(result)}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.post("/api/migration/export-labels")
-async def export_labels_api(dataset_id: str = None, description: str = ""):
-    """导出标注结果"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        manager = MigrationManager()
-        target_id = dataset_id or DATASET_ID
-        export_path = manager.export_labels(target_id, description)
-        if export_path:
-            return {"code": 0, "msg": "导出成功", "export_path": export_path}
-        else:
-            return {"code": -1, "msg": "标注文件不存在"}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.get("/api/migration/list-exports")
-async def list_exports_api():
-    """列出所有已导出的标注文件"""
-    try:
-        from bussiness.migration.sharing import LabelSharingManager
-        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
-        sharing_manager = LabelSharingManager(data_dir)
-        exports = sharing_manager.list_exported_files()
-        return {"code": 0, "data": exports}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-class ShareRequest(BaseModel):
-    source_dataset_id: str
-    target_dataset_ids: List[str]
-    merge_strategy: str = "merge"
-
-
-@app.post("/api/migration/share-labels")
-async def share_labels_api(request: ShareRequest):
-    """跨数据集共享标注"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        manager = MigrationManager()
-        result = manager.share_labels(request.source_dataset_id, request.target_dataset_ids, request.merge_strategy)
-        return result
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.post("/api/migration/import-labels")
-async def import_labels_api(file_path: str, target_dataset_id: str, merge_strategy: str = "merge"):
-    """导入标注结果"""
-    try:
-        from bussiness.migration.sharing import LabelSharingManager
-        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
-        sharing_manager = LabelSharingManager(data_dir)
-        result = sharing_manager.import_labels(file_path, target_dataset_id, merge_strategy)
-        return result
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.delete("/api/migration/delete-export/{filename}")
-async def delete_export_api(filename: str):
-    """删除已导出的标注文件"""
-    try:
-        from bussiness.migration.sharing import LabelSharingManager
-        data_dir = PROJECT_ROOT / "bussiness" / "migration" / "data"
-        sharing_manager = LabelSharingManager(data_dir)
-        success = sharing_manager.delete_exported_file(filename)
-        if success:
-            return {"code": 0, "msg": "删除成功"}
-        else:
-            return {"code": -1, "msg": "文件不存在"}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.get("/api/migration/share-statistics")
-async def get_share_statistics_api():
-    """获取标注共享统计信息"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        manager = MigrationManager()
-        stats = manager.sharing_manager.get_share_statistics()
-        datasets = manager.get_all_datasets()
-        dataset_stats = [manager.get_dataset_label_stats(ds_id) for ds_id in datasets]
-        return {"code": 0, "data": {"share_stats": stats, "datasets": dataset_stats}}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.get("/api/migration/datasets")
-async def get_datasets_api():
-    """获取所有数据集列表"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        manager = MigrationManager()
-        datasets = manager.get_all_datasets()
-        dataset_info = [manager.get_dataset_label_stats(ds_id) for ds_id in datasets]
-        return {"code": 0, "data": dataset_info}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
-@app.get("/api/migration/dataset-stats/{dataset_id}")
-async def get_dataset_stats_api(dataset_id: str):
-    """获取指定数据集的标注统计"""
-    try:
-        from bussiness.migration.manager import MigrationManager
-        manager = MigrationManager()
-        stats = manager.get_dataset_label_stats(dataset_id)
-        return {"code": 0, "data": stats}
-    except Exception as e:
-        return {"code": -1, "msg": str(e)}
-
-
 @app.get("/api/char-images/search")
 async def search_char_images(char: str):
     """搜索已标注的字符图片"""
@@ -2126,6 +1601,20 @@ async def search_char_images(char: str):
         return {"code": 0, "images": labeled_images}
     except Exception as e:
         return {"code": -1, "msg": str(e)}
+
+
+# ======================================
+# 16. 标注加速系统路由
+# ======================================
+from routers.labeling import router as labeling_router
+from routers.clusters import router as clusters_router
+from routers.multi_clustering import router as multi_clustering_router
+from routers.images import router as images_router
+
+app.include_router(labeling_router)
+app.include_router(clusters_router)
+app.include_router(multi_clustering_router)
+app.include_router(images_router)
 
 
 @app.get("/api/line-status")
