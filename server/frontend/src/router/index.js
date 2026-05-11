@@ -7,14 +7,18 @@ import OcrClusterLabelPage from '../views/OcrClusterLabelPage.vue'
 import OcrClusterEditPage from '../views/OcrClusterEditPage.vue'
 import PseudoLabelListPage from '../views/PseudoLabelListPage.vue'
 import PseudoLabelDetailPage from '../views/PseudoLabelDetailPage.vue'
+import PreLabelConfirmPage from '../views/PreLabelConfirmPage.vue'
 import CharManagementPage from '../views/CharManagementPage.vue'
 import LineCheckPage from '../views/LineCheckPage.vue'
 import LineDetailPage from '../views/LineDetailPage.vue'
-import MigrationListPage from '../views/MigrationListPage.vue'
-import MigrationDetailPage from '../views/MigrationDetailPage.vue'
+
+import LabelingDashboard from '../views/LabelingDashboard.vue'
+import MultiClusteringPage from '../views/MultiClusteringPage.vue'
+import MultiClusteringLabelPage from '../views/MultiClusteringLabelPage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomePage },
+  { path: '/dashboard', name: 'dashboard', component: LabelingDashboard },
   { path: '/segment', name: 'segment', component: SegmentLabelPage },
   { path: '/label/:id', name: 'label', component: LabelPage },
   { path: '/ocr', name: 'ocr', component: OcrLabelPage },
@@ -22,11 +26,13 @@ const routes = [
   { path: '/ocr-edit/:id', name: 'ocr-edit', component: OcrClusterEditPage },
   { path: '/pseudo-label', name: 'pseudo-label', component: PseudoLabelListPage },
   { path: '/pseudo-label/:char', name: 'pseudo-label-detail', component: PseudoLabelDetailPage },
+  { path: '/prelabel-confirm/:char', name: 'prelabel-confirm', component: PreLabelConfirmPage },
   { path: '/char-management', name: 'char-management', component: CharManagementPage },
   { path: '/line-check', name: 'line-check', component: LineCheckPage },
   { path: '/line-detail/:lineName', name: 'line-detail', component: LineDetailPage },
-  { path: '/migration-list', name: 'migration-list', component: MigrationListPage },
-  { path: '/migration-detail/:char', name: 'migration-detail', component: MigrationDetailPage },
+  
+  { path: '/multi-clustering', name: 'multi-clustering', component: MultiClusteringPage },
+  { path: '/mc-label/:round/:cluster_id', name: 'mc-label', component: MultiClusteringLabelPage },
 ]
 
 const router = createRouter({

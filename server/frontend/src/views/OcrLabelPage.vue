@@ -194,7 +194,8 @@ const loadData = async () => {
 
       charList.forEach((char, idx) => {
         const labelKey = String(idx)
-        if (charLabels[labelKey]?.char) {
+        // 检查聚类标注或预标注确认
+        if (charLabels[labelKey]?.char || char.confirmed) {
           labeledCount++
         } else {
           unlabeledCount++
@@ -271,8 +272,7 @@ const saveAlias = async (record) => {
 
 const goClusterLabel = (clusterId) => {
   highlightedClusterId.value = parseInt(clusterId)
-  const dataset = localStorage.getItem('selectedDataset') || 'pdf01'
-  window.open(`/ocr-label/${clusterId}?dataset=${encodeURIComponent(dataset)}`, '_blank')
+  window.open(`/ocr-label/${clusterId}`, '_blank')
 }
 
 const goBack = () => {
