@@ -1,0 +1,308 @@
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+from services.multi_clustering_manager import MultiClusteringManager
+from services.char_pool_manager import CharPoolManager
+
+router = APIRouter(prefix="/api/mc", tags=["多轮聚类"])
+
+# 模型定义
+class LabelItem(BaseModel):
+    charIndex: int
+    char: str
+
+class BatchLabelSave(BaseModel):
+    round: int
+    clusterId: str
+    labels: List[LabelItem]
+
+class NewRoundRequest(BaseModel):
+    n_clusters: Optional[int] = None
+    description: Optional[str] = ""
+
+
+@router.get("/rounds")
+def get_rounds():
+    """获取所有轮次"""
+    try:
+        manager = MultiClusteringManager()
+        history = manager.get_round_history()
+        return {"code": 0, "msg": "success", "data": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds")
+def start_new_round(request: NewRoundRequest):
+    """启动新一轮聚类"""
+    try:
+        manager = MultiClusteringManager()
+        round_num = manager.start_new_round(
+            n_clusters=request.n_clusters,
+            description=request.description
+        )
+        return {
+            "code": 0, 
+            "msg": "success",
+            "round": round_num,
+            "message": f"第{round_num}轮聚类已启动"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rounds/{round_num}")
+def get_round_info(round_num: int):
+    """获取指定轮次信息"""
+    try:
+        manager = MultiClusteringManager()
+        clusters = manager.get_round_clusters(round_num)
+        progress = manager.get_round_progress(round_num)
+        
+        if not clusters:
+            raise HTTPException(status_code=404, detail=f"轮次 {round_num} 不存在")
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "round": round_num,
+            "clusters": clusters.get("clusters", {}),
+            "total_clusters": len(clusters.get("clusters", {})),
+            "total_chars": clusters.get("total_chars", 0),
+            "progress": progress
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rounds/{round_num}/clusters")
+def get_round_clusters(round_num: int):
+    """获取指定轮次的聚类列表"""
+    try:
+        manager = MultiClusteringManager()
+        clusters = manager.get_round_clusters(round_num)
+        
+        if not clusters:
+            raise HTTPException(status_code=404, detail=f"轮次 {round_num} 不存在")
+        
+        cluster_list = []
+        for cluster_id, chars in clusters.get("clusters", {}).items():
+            labels = manager.get_round_labels(round_num)
+            cluster_labels = labels.get("labels", {}).get(cluster_id, {}) if labels else {}
+            
+            cluster_list.append({
+                "cluster_id": cluster_id,
+                "char_count": len(chars),
+                "status": cluster_labels.get("status", "unlabeled"),
+                "char": cluster_labels.get("char"),
+                "confidence": cluster_labels.get("confidence")
+            })
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "round": round_num,
+            "clusters": cluster_list,
+            "total": len(cluster_list)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rounds/{round_num}/clusters/{cluster_id}")
+def get_cluster_detail(round_num: int, cluster_id: str):
+    """获取聚类详情"""
+    try:
+        manager = MultiClusteringManager()
+        clusters = manager.get_round_clusters(round_num)
+        labels = manager.get_round_labels(round_num)
+        
+        if not clusters:
+            raise HTTPException(status_code=404, detail=f"轮次 {round_num} 不存在")
+        
+        cluster_chars = clusters.get("clusters", {}).get(cluster_id)
+        if not cluster_chars:
+            raise HTTPException(status_code=404, detail=f"聚类 {cluster_id} 不存在")
+        
+        cluster_labels = labels.get("labels", {}).get(cluster_id, {}) if labels else {}
+        
+        # 构建字符详情
+        char_details = []
+        for idx, char_info in enumerate(cluster_chars):
+            char_key = str(idx)
+            char_label = cluster_labels.get("char_labels", {}).get(char_key, {})
+            
+            char_details.append({
+                "index": idx,
+                "char_id": char_info.get("char_id", ""),
+                "line_name": char_info.get("line_name", ""),
+                "col_start": char_info.get("col_start", 0),
+                "col_end": char_info.get("col_end", 0),
+                "label": char_label.get("char"),
+                "labeled_at": char_label.get("labeled_at")
+            })
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "round": round_num,
+            "cluster_id": cluster_id,
+            "status": cluster_labels.get("status", "unlabeled"),
+            "char": cluster_labels.get("char"),
+            "confidence": cluster_labels.get("confidence"),
+            "chars": char_details,
+            "total": len(char_details)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/clusters/{cluster_id}/labels")
+def save_cluster_label(round_num: int, cluster_id: str, body: LabelItem):
+    """保存单个标注"""
+    try:
+        manager = MultiClusteringManager()
+        success = manager.save_label(round_num, cluster_id, body.charIndex, body.char)
+        
+        if success:
+            return {"code": 0, "msg": "保存成功"}
+        else:
+            raise HTTPException(status_code=500, detail="保存失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/clusters/{cluster_id}/labels/batch")
+def batch_save_cluster_labels(round_num: int, cluster_id: str, body: BatchLabelSave):
+    """批量保存标注"""
+    try:
+        manager = MultiClusteringManager()
+        saved_count = manager.save_batch_labels(round_num, cluster_id, body.labels)
+        
+        return {
+            "code": 0,
+            "msg": f"批量保存成功，共 {saved_count} 条",
+            "saved_count": saved_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/clusters/{cluster_id}/skip")
+def skip_cluster(round_num: int, cluster_id: str):
+    """跳过聚类"""
+    try:
+        manager = MultiClusteringManager()
+        success = manager.skip_cluster(round_num, cluster_id)
+        
+        if success:
+            return {"code": 0, "msg": "已跳过"}
+        else:
+            raise HTTPException(status_code=500, detail="操作失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/char-pool")
+def get_char_pool_stats():
+    """获取字符池统计"""
+    try:
+        char_pool = CharPoolManager()
+        stats = char_pool.get_stats()
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/char-pool/init")
+def init_char_pool():
+    """初始化字符池"""
+    try:
+        char_pool = CharPoolManager()
+        count = char_pool.init_from_lineage()
+        
+        return {
+            "code": 0,
+            "msg": f"字符池初始化成功",
+            "total_chars": count
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/char-pool/unlabeled")
+def get_unlabeled_chars(page: int = Query(1, ge=1), page_size: int = Query(100, ge=1)):
+    """获取未标注字符列表（分页）"""
+    try:
+        char_pool = CharPoolManager()
+        unlabeled_ids = char_pool.get_unlabeled_char_ids()
+        
+        total = len(unlabeled_ids)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = unlabeled_ids[start:end]
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": paginated,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rounds/{round_num}/progress")
+def get_round_progress(round_num: int):
+    """获取轮次进度"""
+    try:
+        manager = MultiClusteringManager()
+        progress = manager.get_round_progress(round_num)
+        
+        if not progress:
+            raise HTTPException(status_code=404, detail=f"轮次 {round_num} 不存在")
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": progress
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/unified-labels/count")
+def get_unified_labels_count():
+    """获取统一标注数量"""
+    try:
+        manager = MultiClusteringManager()
+        unified_data = manager._load_json(manager.unified_labels_path)
+        count = len(unified_data.get("annotations", [])) if unified_data else 0
+        
+        return {
+            "code": 0,
+            "msg": "success",
+            "count": count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
