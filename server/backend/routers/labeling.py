@@ -11,6 +11,7 @@ from labeling_task_manager import LabelingTaskManager
 from pseudo_label_generator import PseudoLabelGenerator
 from simple_char_clustering import SimpleCharClustering
 from datastore.stats_manager import StatsManager
+from datastore.data_store import DataStore
 
 task_manager = LabelingTaskManager(config._config)
 prelabel_generator = PseudoLabelGenerator(config._config)
@@ -69,7 +70,7 @@ def get_labeling_stats():
         "dataset": stats.get("dataset", config.get("dataset.current", "pdf5823")),
         "total_images": stats.get("total_images", 0),
         "labeled_count": stats.get("labeled_count", 0),
-        "prelabeled_count": stats.get("total_images", 0),
+        "prelabeled_count": stats.get("total_images", 0) - stats.get("unlabeled_count", 0),
         "unlabeled_count": stats.get("unlabeled_count", 0),
         "char_stats": char_stats
     }
@@ -325,3 +326,53 @@ def run_clustering(min_samples: int = 3):
             return {"code": -1, "msg": "没有未标注图片"}
     except Exception as e:
         return {"code": -1, "msg": f"聚类失败: {str(e)}"}
+
+
+# ==================== 同步日志查询接口 ====================
+
+@router.get("/api/labeling/sync/logs")
+def get_sync_logs(limit: int = 100, date: Optional[str] = None):
+    """获取同步日志"""
+    dataset = config.get("dataset.current", "pdf5823")
+    store = DataStore(dataset)
+    
+    if date:
+        logs = store.get_sync_logs_by_date(date)
+    else:
+        logs = store.get_sync_logs(limit)
+    
+    return {
+        "code": 0,
+        "msg": "success",
+        "data": logs,
+        "total": len(logs)
+    }
+
+
+@router.get("/api/labeling/sync/logs/today")
+def get_today_sync_logs():
+    """获取今日同步日志"""
+    dataset = config.get("dataset.current", "pdf5823")
+    store = DataStore(dataset)
+    logs = store.get_today_sync_logs()
+    
+    return {
+        "code": 0,
+        "msg": "success",
+        "data": logs,
+        "total": len(logs)
+    }
+
+
+@router.get("/api/labeling/sync/stats")
+def get_sync_statistics():
+    """获取同步统计信息"""
+    dataset = config.get("dataset.current", "pdf5823")
+    store = DataStore(dataset)
+    stats = store.get_sync_statistics()
+    
+    return {
+        "code": 0,
+        "msg": "success",
+        "data": stats
+    }
