@@ -28,10 +28,21 @@ class CharPoolManager:
         self._unlabeled_cache: Optional[List[str]] = None
     
     def _load_json(self, path: Path):
-        """加载JSON文件"""
+        """加载JSON文件（处理编码错误）"""
         if path.exists():
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except UnicodeDecodeError:
+                # 尝试使用替换模式处理编码错误
+                with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                    # 移除无效字符
+                    content = content.replace('\ufffd', '')
+                    try:
+                        return json.loads(content)
+                    except json.JSONDecodeError:
+                        return None
         return None
     
     def _save_json(self, path: Path, data: dict):
@@ -126,48 +137,59 @@ class CharPoolManager:
         return len(all_chars)
     
     def _get_existing_labeled_chars(self) -> Dict[str, str]:
-        """从现有聚类系统中获取已标注的字符映射 {char_id: char}"""
+        """从现有聚类系统和统一标注中获取已标注的字符映射 {char_id: char}"""
         labeled_chars = {}
         
+        # 1. 从统一标注加载（优先级最高）
+        try:
+            from datastore.data_store import DataStore
+            ds = DataStore(self.dataset_id)
+            confirmed = ds.get_confirmed_annotations()
+            labeled_chars.update(confirmed)
+            print(f"从统一标注加载已标注字符: {len(confirmed)}")
+        except Exception as e:
+            print(f"从统一标注加载失败: {e}")
+        
+        # 2. 从聚类系统加载（作为补充）
         clusters_dir = self.project_root / "bussiness" / "datahome" / self.dataset_id / "clusters"
         hog_clusters_path = clusters_dir / "hog_clusters.json"
         labels_path = clusters_dir / "labeling" / "labels.json"
         
-        if not hog_clusters_path.exists() or not labels_path.exists():
-            return labeled_chars
-        
-        try:
-            with open(hog_clusters_path, 'r', encoding='utf-8') as f:
-                clusters_data = json.load(f)
-            
-            with open(labels_path, 'r', encoding='utf-8') as f:
-                labels_data = json.load(f)
-            
-            clusters = clusters_data.get("clusters", {})
-            
-            for cluster_id, cluster_chars in clusters.items():
-                label_info = labels_data.get(cluster_id, {})
-                if label_info.get("status") == "labeled" and label_info.get("char_labels"):
-                    # 聚类已标注，获取标注的汉字
-                    cluster_label = label_info.get("char", "")
-                    if not cluster_label:
-                        continue
-                    
-                    for idx, char_label_info in label_info["char_labels"].items():
-                        if char_label_info.get("char"):
-                            cluster_label = char_label_info["char"]
-                        
-                        try:
-                            idx_int = int(idx)
-                            if idx_int < len(cluster_chars):
-                                char_id = cluster_chars[idx_int].get("char_id", "")
-                                if char_id:
-                                    labeled_chars[char_id] = cluster_label
-                        except (ValueError, IndexError):
+        if hog_clusters_path.exists() and labels_path.exists():
+            try:
+                with open(hog_clusters_path, 'r', encoding='utf-8') as f:
+                    clusters_data = json.load(f)
+                
+                with open(labels_path, 'r', encoding='utf-8') as f:
+                    labels_data = json.load(f)
+                
+                clusters = clusters_data.get("clusters", {})
+                cluster_labeled_count = 0
+                
+                for cluster_id, cluster_chars in clusters.items():
+                    label_info = labels_data.get(cluster_id, {})
+                    if label_info.get("status") == "labeled" and label_info.get("char_labels"):
+                        cluster_label = label_info.get("char", "")
+                        if not cluster_label:
                             continue
-        
-        except Exception as e:
-            print(f"加载已标注字符失败: {e}")
+                        
+                        for idx, char_label_info in label_info["char_labels"].items():
+                            if char_label_info.get("char"):
+                                cluster_label = char_label_info["char"]
+                            
+                            try:
+                                idx_int = int(idx)
+                                if idx_int < len(cluster_chars):
+                                    char_id = cluster_chars[idx_int].get("char_id", "")
+                                    if char_id and char_id not in labeled_chars:
+                                        labeled_chars[char_id] = cluster_label
+                                        cluster_labeled_count += 1
+                            except (ValueError, IndexError):
+                                continue
+                
+                print(f"从聚类系统加载已标注字符: {cluster_labeled_count}")
+            except Exception as e:
+                print(f"从聚类系统加载失败: {e}")
         
         return labeled_chars
     

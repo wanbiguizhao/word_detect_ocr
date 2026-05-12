@@ -10,7 +10,11 @@ from .char_pool_manager import CharPoolManager
 class MultiClusteringManager:
     """多轮聚类管理器 - 完全独立于现有聚类系统"""
     
-    def __init__(self, dataset_id: str = "pdf5823"):
+    def __init__(self, dataset_id: str = None):
+        if dataset_id is None:
+            from config import DATASET_ID
+            dataset_id = DATASET_ID
+        
         self.dataset_id = dataset_id
         # 项目根目录: d:\projects\word_detect_ocr
         self.project_root = Path(__file__).parent.parent.parent.parent
@@ -25,6 +29,10 @@ class MultiClusteringManager:
         
         # 字符池管理器
         self.char_pool = CharPoolManager(dataset_id)
+        
+        # 数据存储抽象层（用于传播更新）
+        from datastore.data_store import DataStore
+        self.data_store = DataStore(dataset_id)
         
         # 加载配置
         self.config = self._load_config()
@@ -86,6 +94,170 @@ class MultiClusteringManager:
             print(f"提取HOG特征失败: {e}")
             return None
     
+    def _sort_cluster_by_similarity(self, clusters: Dict[str, List[dict]], 
+                                    cluster_indices: Dict[str, List[int]],
+                                    features: np.ndarray) -> Dict[str, List[dict]]:
+        """
+        对每个聚类内部的图片按照相似度排序，使相似的图片尽可能靠近
+        
+        Args:
+            clusters: 原始聚类结果
+            cluster_indices: 每个聚类包含的特征索引
+            features: 所有字符的特征矩阵
+        
+        Returns:
+            排序后的聚类结果
+        """
+        from sklearn.metrics.pairwise import cosine_similarity
+        
+        sorted_clusters = {}
+        
+        for cluster_id_str, cluster_chars in clusters.items():
+            indices = cluster_indices[cluster_id_str]
+            if len(indices) <= 1:
+                # 只有一个元素，无需排序
+                sorted_clusters[cluster_id_str] = cluster_chars
+                continue
+            
+            # 获取该聚类的所有特征
+            cluster_features = features[indices]
+            
+            # 计算相似度矩阵
+            sim_matrix = cosine_similarity(cluster_features)
+            
+            # 使用贪心算法进行排序：每次选择与当前序列最相似的元素
+            n = len(cluster_chars)
+            visited = [False] * n
+            order = []
+            
+            # 从相似度最大的元素开始（作为中心）
+            avg_sim = sim_matrix.mean(axis=1)
+            start_idx = int(np.argmax(avg_sim))
+            order.append(start_idx)
+            visited[start_idx] = True
+            
+            # 贪心选择下一个最相似的元素
+            for _ in range(n - 1):
+                last_idx = order[-1]
+                max_sim = -1
+                next_idx = -1
+                
+                for i in range(n):
+                    if not visited[i]:
+                        sim = sim_matrix[last_idx, i]
+                        if sim > max_sim:
+                            max_sim = sim
+                            next_idx = i
+                
+                if next_idx != -1:
+                    visited[next_idx] = True
+                    order.append(next_idx)
+            
+            # 根据排序结果重新排列字符
+            sorted_chars = [cluster_chars[i] for i in order]
+            sorted_clusters[cluster_id_str] = sorted_chars
+        
+        return sorted_clusters
+    
+    def _split_large_clusters(self, clusters: Dict[str, List[dict]],
+                              cluster_indices: Dict[str, List[int]],
+                              features: np.ndarray,
+                              max_cluster_size: int) -> tuple:
+        """
+        拆分超过最大聚类大小限制的聚类
+        
+        Args:
+            clusters: 原始聚类结果
+            cluster_indices: 每个聚类包含的特征索引
+            features: 所有字符的特征矩阵
+            max_cluster_size: 最大聚类大小限制
+        
+        Returns:
+            tuple: (拆分后的聚类结果, 对应的索引信息)
+        """
+        # 调试日志
+        print(f"[_split_large_clusters] 开始拆分超大类")
+        print(f"  max_cluster_size: {max_cluster_size}")
+        print(f"  原始聚类数: {len(clusters)}")
+        
+        from sklearn.metrics.pairwise import cosine_similarity
+        
+        result_clusters = {}
+        result_indices = {}
+        new_cluster_id = 1000  # 使用较大的起始ID避免冲突
+        
+        for cluster_id_str, cluster_chars in clusters.items():
+            if len(cluster_chars) <= max_cluster_size:
+                # 聚类大小在限制范围内，直接保留
+                result_clusters[cluster_id_str] = cluster_chars
+                result_indices[cluster_id_str] = cluster_indices[cluster_id_str]
+                continue
+            
+            # 超过限制，需要拆分
+            print(f"拆分超大类 {cluster_id_str}，大小: {len(cluster_chars)}")
+            
+            # 获取该聚类的所有特征
+            indices = cluster_indices[cluster_id_str]
+            cluster_features = features[indices]
+            
+            # 计算相似度矩阵
+            sim_matrix = cosine_similarity(cluster_features)
+            
+            n = len(cluster_chars)
+            visited = [False] * n
+            
+            # 贪心算法：每次选择一个中心点，然后选择与它最相似的k个元素形成一个子聚类
+            while not all(visited):
+                # 找到未访问元素中与其他未访问元素平均相似度最高的作为中心
+                max_avg_sim = -1
+                center_idx = -1
+                
+                for i in range(n):
+                    if visited[i]:
+                        continue
+                    
+                    # 计算与其他未访问元素的平均相似度
+                    unvisited_indices = [j for j in range(n) if not visited[j] and j != i]
+                    if not unvisited_indices:
+                        avg_sim = 0
+                    else:
+                        avg_sim = np.mean([sim_matrix[i, j] for j in unvisited_indices])
+                    
+                    if avg_sim > max_avg_sim:
+                        max_avg_sim = avg_sim
+                        center_idx = i
+                
+                if center_idx == -1:
+                    break
+                
+                # 选择与中心最相似的 max_cluster_size 个元素形成一个子聚类
+                visited[center_idx] = True
+                sub_cluster = [cluster_chars[center_idx]]
+                sub_indices = [indices[center_idx]]  # 记录原始特征索引
+                
+                # 获取未访问元素中与中心的相似度
+                candidates = []
+                for i in range(n):
+                    if not visited[i]:
+                        candidates.append((i, sim_matrix[center_idx, i]))
+                
+                # 按相似度降序排序
+                candidates.sort(key=lambda x: x[1], reverse=True)
+                
+                # 选择前 max_cluster_size - 1 个（已经包含中心）
+                for i, _ in candidates[:max_cluster_size - 1]:
+                    visited[i] = True
+                    sub_cluster.append(cluster_chars[i])
+                    sub_indices.append(indices[i])  # 记录原始特征索引
+                
+                # 添加到结果中
+                result_clusters[str(new_cluster_id)] = sub_cluster
+                result_indices[str(new_cluster_id)] = sub_indices
+                new_cluster_id += 1
+        
+        print(f"超大类拆分完成，原始聚类数: {len(clusters)}，拆分后聚类数: {len(result_clusters)}")
+        return result_clusters, result_indices
+    
     def get_current_round(self) -> int:
         """获取当前最新轮次"""
         history = self._load_json(self.history_path)
@@ -94,8 +266,21 @@ class MultiClusteringManager:
         return 0
     
     def start_new_round(self, n_clusters: Optional[int] = None, 
-                        description: str = "") -> int:
+                        description: str = "",
+                        method: str = "hdbscan",
+                        min_cluster_size: int = 5,
+                        min_samples: int = 2,
+                        max_cluster_size: int = 100) -> int:
         """启动新一轮聚类"""
+        # 调试日志：打印接收到的参数
+        print(f"[Manager] start_new_round 接收到的参数:")
+        print(f"  method: {method}")
+        print(f"  n_clusters: {n_clusters}")
+        print(f"  description: {description}")
+        print(f"  min_cluster_size: {min_cluster_size}")
+        print(f"  min_samples: {min_samples}")
+        print(f"  max_cluster_size: {max_cluster_size}")
+        
         # 获取未标注字符
         unlabeled_ids = self.char_pool.get_unlabeled_char_ids()
         
@@ -109,16 +294,6 @@ class MultiClusteringManager:
         
         if not unlabeled_ids:
             raise ValueError("没有未标注字符，无法启动新轮聚类")
-        
-        # 设置聚类参数
-        if n_clusters is None:
-            n_clusters = self.config["clustering"]["default_n_clusters"]
-        
-        # 限制聚类数量不超过字符数量
-        n_clusters = min(n_clusters, len(unlabeled_ids))
-        
-        if n_clusters < 1:
-            raise ValueError("聚类数量必须大于0")
         
         # 获取字符特征
         features_dict = {}
@@ -135,30 +310,43 @@ class MultiClusteringManager:
         if not valid_char_ids:
             raise ValueError("无法提取任何字符特征")
         
-        # 执行HDBSCAN聚类
+        # 执行聚类
         features = np.array([features_dict[char_id] for char_id in valid_char_ids])
+        labels = None
         
         try:
-            # 计算余弦距离矩阵（1 - 余弦相似度）
-            from scipy.spatial.distance import squareform, pdist
-            cosine_dist_matrix = squareform(pdist(features, 'cosine'))
-            
-            # HDBSCAN 参数说明：
-            # min_cluster_size: 最小聚类大小
-            # min_samples: 每个核心点周围的最小样本数
-            # metric: 使用预计算的距离矩阵
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=5,
-                min_samples=2,
-                metric='precomputed',
-                cluster_selection_method='eom'
-            )
-            labels = clusterer.fit_predict(cosine_dist_matrix)
+            if method == "hdbscan":
+                from scipy.spatial.distance import squareform, pdist
+                cosine_dist_matrix = squareform(pdist(features, 'cosine'))
+                
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=min_cluster_size,
+                    min_samples=min_samples,
+                    metric='precomputed',
+                    cluster_selection_method='eom'
+                )
+                labels = clusterer.fit_predict(cosine_dist_matrix)
+            elif method == "kmeans":
+                from sklearn.cluster import KMeans
+                
+                if n_clusters is None:
+                    n_clusters = 20
+                
+                n_clusters = min(n_clusters, len(valid_char_ids))
+                if n_clusters < 1:
+                    n_clusters = 1
+                
+                clusterer = KMeans(n_clusters=n_clusters, random_state=42)
+                labels = clusterer.fit_predict(features)
+            else:
+                raise ValueError(f"不支持的聚类方法: {method}")
         except Exception as e:
             raise RuntimeError(f"聚类失败: {e}")
         
         # 构建聚类结果（过滤噪声点，label=-1表示噪声）
         clusters: Dict[str, List[dict]] = {}
+        cluster_indices: Dict[str, List[int]] = {}  # 记录每个聚类包含的索引
+        
         for idx, char_id in enumerate(valid_char_ids):
             cluster_id = labels[idx]
             if cluster_id == -1:
@@ -166,6 +354,7 @@ class MultiClusteringManager:
             cluster_id_str = str(cluster_id)
             if cluster_id_str not in clusters:
                 clusters[cluster_id_str] = []
+                cluster_indices[cluster_id_str] = []
             
             # 获取字符信息
             char_info = self.char_pool.load_all_chars().get(char_id, {})
@@ -175,6 +364,14 @@ class MultiClusteringManager:
                 "col_start": char_info.get("col_start", 0),
                 "col_end": char_info.get("col_end", 0)
             })
+            cluster_indices[cluster_id_str].append(idx)
+        
+        # 拆分超大类（超过max_cluster_size限制的聚类）
+        if max_cluster_size > 0:
+            clusters, cluster_indices = self._split_large_clusters(clusters, cluster_indices, features, max_cluster_size)
+        
+        # 对每个聚类内部按照相似度排序（相似的图片放在一起）
+        clusters = self._sort_cluster_by_similarity(clusters, cluster_indices, features)
         
         # 创建轮次目录
         new_round = self.get_current_round() + 1
@@ -185,11 +382,18 @@ class MultiClusteringManager:
         clusters_data = {
             "version": "1.0",
             "round": new_round,
-            "algorithm": self.config["clustering"]["algorithm"],
-            "n_clusters": n_clusters,
+            "algorithm": method,
+            "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
             "created_at": datetime.datetime.now().isoformat(),
-            "clusters": clusters
+            "clusters": clusters,
+            "params": {
+                "min_cluster_size": min_cluster_size,
+                "min_samples": min_samples,
+                "max_cluster_size": max_cluster_size
+            } if method == "hdbscan" else {
+                "n_clusters": n_clusters
+            }
         }
         self._save_json(round_dir / "hog_clusters.json", clusters_data)
         
@@ -216,8 +420,8 @@ class MultiClusteringManager:
         history["rounds"].append({
             "round": new_round,
             "date": datetime.datetime.now().isoformat(),
-            "algorithm": self.config["clustering"]["algorithm"],
-            "n_clusters": n_clusters,
+            "algorithm": method,
+            "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
             "description": description or f"第{new_round}轮聚类"
         })
@@ -247,7 +451,7 @@ class MultiClusteringManager:
     
     def save_label(self, round_num: int, cluster_id: str, 
                    char_index: int, char: str) -> bool:
-        """保存标注"""
+        """保存标注 - 支持传播更新到所有相关数据源"""
         round_dir = self.rounds_dir / f"round_{round_num}"
         labels_path = round_dir / "labels.json"
         
@@ -255,6 +459,13 @@ class MultiClusteringManager:
             return False
         
         labels_data = self._load_json(labels_path)
+        
+        if labels_data is None:
+            labels_data = {"labels": {}}
+        
+        # 确保labels字段存在
+        if "labels" not in labels_data:
+            labels_data["labels"] = {}
         
         # 确保cluster_id存在
         if cluster_id not in labels_data["labels"]:
@@ -267,7 +478,7 @@ class MultiClusteringManager:
                 "char_labels": {}
             }
         
-        # 保存标注
+        # 保存标注到多轮聚类本地文件
         char_key = str(char_index)
         labels_data["labels"][cluster_id]["char_labels"][char_key] = {
             "char": char,
@@ -285,21 +496,32 @@ class MultiClusteringManager:
             labels_data["labels"][cluster_id]["chars"] = dict(char_counts)
             labels_data["labels"][cluster_id]["status"] = "labeled"
         
-        # 保存标注
+        # 保存标注到本地文件
         self._save_json(labels_path, labels_data)
         
-        # 获取字符ID并更新字符池
-        clusters_data = self.get_round_clusters(round_num)
-        if clusters_data:
-            cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
-            if char_index < len(cluster_chars):
-                char_id = cluster_chars[char_index].get("char_id")
-                if char_id:
-                    self.char_pool.mark_as_labeled(char_id, char, round_num)
-                    
-                    # 同步到统一标注
-                    if self.config.get("sync", {}).get("auto_sync_to_unified", True):
-                        self._sync_to_unified(char_id, char)
+        # 获取字符ID
+        char_id = None
+        try:
+            clusters_data = self.get_round_clusters(round_num)
+            if clusters_data:
+                cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
+                if char_index < len(cluster_chars):
+                    char_id = cluster_chars[char_index].get("char_id")
+        except Exception as e:
+            # 忽略获取字符ID的错误，继续保存标注
+            pass
+        
+        if char_id:
+            # 更新字符池
+            self.char_pool.mark_as_labeled(char_id, char, round_num)
+            
+            # 使用 DataStore 实现传播更新
+            # 这将自动同步到：
+            # 1. unified_labels.json（统一标注）
+            # 2. clusters/labeling/labels.json（聚类标注）
+            # 3. pre_labels.json（预标注状态）
+            # 4. multi_clustering/ 中的其他轮次（如果字符存在）
+            self.data_store.write_annotation(char_id, char)
         
         return True
     
@@ -330,14 +552,86 @@ class MultiClusteringManager:
     
     def save_batch_labels(self, round_num: int, cluster_id: str, 
                           labels: List[Dict[str, Any]]) -> int:
-        """批量保存标注"""
-        saved_count = 0
+        """批量保存标注 - 优化版本：一次性写入文件和同步"""
+        round_dir = self.rounds_dir / f"round_{round_num}"
+        labels_path = round_dir / "labels.json"
+        
+        if not labels_path.exists():
+            return 0
+        
+        # 一次性加载标签数据
+        labels_data = self._load_json(labels_path)
+        if labels_data is None:
+            labels_data = {"labels": {}}
+        if "labels" not in labels_data:
+            labels_data["labels"] = {}
+        
+        # 确保cluster_id存在
+        if cluster_id not in labels_data["labels"]:
+            labels_data["labels"][cluster_id] = {
+                "char": None,
+                "chars": {},
+                "status": "unlabeled",
+                "confidence": None,
+                "alias": "",
+                "char_labels": {}
+            }
+        
+        # 收集需要同步的字符ID
+        chars_to_sync = []
+        
+        # 批量更新标签（支持字典和Pydantic对象）
         for label in labels:
-            char_index = label.get("charIndex")
-            char = label.get("char")
+            # 支持字典和Pydantic对象
+            if hasattr(label, 'charIndex'):
+                char_index = label.charIndex
+                char = label.char
+            else:
+                char_index = label.get("charIndex")
+                char = label.get("char")
+            
             if char_index is not None and char:
-                if self.save_label(round_num, cluster_id, char_index, char):
-                    saved_count += 1
+                char_key = str(char_index)
+                labels_data["labels"][cluster_id]["char_labels"][char_key] = {
+                    "char": char,
+                    "labeled_at": datetime.datetime.now().isoformat()
+                }
+                chars_to_sync.append((char_index, char))
+        
+        # 更新统计
+        all_chars = [v["char"] for v in labels_data["labels"][cluster_id]["char_labels"].values() if v.get("char")]
+        if all_chars:
+            from collections import Counter
+            char_counts = Counter(all_chars)
+            most_common = char_counts.most_common(1)[0]
+            labels_data["labels"][cluster_id]["char"] = most_common[0]
+            labels_data["labels"][cluster_id]["confidence"] = most_common[1] / len(all_chars)
+            labels_data["labels"][cluster_id]["chars"] = dict(char_counts)
+            labels_data["labels"][cluster_id]["status"] = "labeled"
+        
+        # 一次性保存到本地文件
+        self._save_json(labels_path, labels_data)
+        
+        # 获取字符ID并批量同步
+        saved_count = 0
+        try:
+            clusters_data = self.get_round_clusters(round_num)
+            if clusters_data:
+                cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
+                
+                for char_index, char in chars_to_sync:
+                    if char_index < len(cluster_chars):
+                        char_id = cluster_chars[char_index].get("char_id")
+                        if char_id:
+                            # 更新字符池
+                            self.char_pool.mark_as_labeled(char_id, char, round_num)
+                            # 使用 DataStore 实现传播更新
+                            self.data_store.write_annotation(char_id, char)
+                            saved_count += 1
+        except Exception as e:
+            # 同步失败不影响本地保存
+            pass
+        
         return saved_count
     
     def get_round_history(self) -> dict:
