@@ -360,15 +360,21 @@ const saveLabel = async (img) => {
 }
 
 const saveAll = async () => {
-  if (!batchChar.value) return
+  if (!batchChar.value || selectedIndices.value.length === 0) return
 
   saving.value = true
   try {
+    // 使用批量提交接口
+    const labels = selectedIndices.value.map(index => ({
+      charIndex: index,
+      char: batchChar.value
+    }))
+
+    await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels/batch`, {
+      labels
+    })
+
     for (const index of selectedIndices.value) {
-      await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels`, {
-        charIndex: index,
-        char: batchChar.value
-      })
       const img = images.value[index]
       if (img) {
         img.label = batchChar.value

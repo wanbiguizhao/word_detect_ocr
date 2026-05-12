@@ -14,6 +14,39 @@
       <a-statistic title="聚类轮次" :value="rounds.length" />
     </div>
 
+    <!-- 参数配置面板 -->
+    <div class="params-panel">
+      <a-collapse :activeKey="['params']" :bordered="false">
+      <a-collapse-panel key="params" header="聚类参数配置">
+        <a-form layout="inline">
+          <a-form-item label="聚类方法">
+            <a-select v-model:value="method" style="width: 120px;">
+              <a-select-option value="hdbscan">HDBSCAN</a-select-option>
+              <a-select-option value="kmeans">KMeans</a-select-option>
+            </a-select>
+          </a-form-item>
+          
+          <a-form-item v-if="method === 'hdbscan'" label="最小聚类大小">
+            <input type="number" v-model.number="min_cluster_size" min="3" max="50" class="param-input" />
+          </a-form-item>
+          
+          <a-form-item v-if="method === 'hdbscan'" label="核心点样本数">
+            <input type="number" v-model.number="min_samples" min="1" max="20" class="param-input" />
+          </a-form-item>
+          
+          <a-form-item v-if="method === 'hdbscan'" label="最大聚类大小">
+            <input type="number" v-model.number="max_cluster_size" min="10" max="200" class="param-input" />
+          </a-form-item>
+          
+          <a-form-item v-if="method === 'kmeans'" label="目标聚类数">
+            <input type="number" v-model.number="n_clusters" min="2" max="100" class="param-input" />
+          </a-form-item>
+        </a-form>
+        <a-button @click="showParams" style="margin-top: 12px;">显示当前参数</a-button>
+      </a-collapse-panel>
+    </a-collapse>
+    </div>
+
     <!-- 操作区域 -->
     <div class="toolbar">
       <div class="new-round-form">
@@ -64,12 +97,27 @@
           </a-tag>
         </template>
       </a-table-column>
-      <a-table-column title="汉字" width="150">
+      <a-table-column title="汉字" width="200">
         <template #default="{ record }">
-          <span class="chars-display">{{ record.char || '?' }}</span>
+          <template v-if="record.char_counts && Object.keys(record.char_counts).length > 0">
+            <span 
+              v-for="(count, char) in record.char_counts" 
+              :key="char" 
+              class="char-tag"
+            >
+              {{ char }}({{ count }})
+            </span>
+          </template>
+          <template v-else>
+            <span class="chars-display">{{ record.char || '?' }}</span>
+          </template>
         </template>
       </a-table-column>
-      <a-table-column title="字符数量" data-index="char_count" width="100" />
+      <a-table-column title="字符数量" width="120">
+        <template #default="{ record }">
+          {{ record.labeled_count || 0 }}/{{ record.char_count }}
+        </template>
+      </a-table-column>
       <a-table-column title="操作" width="150">
         <template #default="{ record }">
           <a-button 
@@ -119,6 +167,13 @@ const newRoundClusters = ref(100)
 const newRoundDesc = ref('')
 const isStarting = ref(false)
 const activeClusterId = ref(null)
+
+// 聚类参数配置 - 使用单独的 ref
+const method = ref('hdbscan')
+const min_cluster_size = ref(5)
+const min_samples = ref(2)
+const max_cluster_size = ref(100)
+const n_clusters = ref(20)
 
 const formatDate = (dateStr) => {
   const date = new Date(dateStr)
@@ -196,15 +251,41 @@ const fetchRoundDetail = async (roundNum) => {
   }
 }
 
+const showParams = () => {
+  console.log('[DEBUG] method:', method.value)
+  console.log('[DEBUG] min_cluster_size:', min_cluster_size.value)
+  console.log('[DEBUG] min_samples:', min_samples.value)
+  console.log('[DEBUG] max_cluster_size:', max_cluster_size.value)
+  console.log('[DEBUG] n_clusters:', n_clusters.value)
+  
+  alert(`当前参数:\n\nmethod: ${method.value}\nmin_cluster_size: ${min_cluster_size.value}\nmin_samples: ${min_samples.value}\nmax_cluster_size: ${max_cluster_size.value}\nn_clusters: ${n_clusters.value}`)
+}
+
 const startNewRound = async () => {
   if (isStarting.value) return
   
   isStarting.value = true
   try {
-    const res = await axios.post(`${API_BASE}/rounds`, {
-      n_clusters: newRoundClusters.value,
-      description: newRoundDesc.value || `第${rounds.value.length + 1}轮聚类`
-    })
+    console.log('[Frontend] 准备发送的参数:')
+    console.log('  method:', method.value)
+    console.log('  max_cluster_size:', max_cluster_size.value)
+    
+    const params = {
+      description: newRoundDesc.value || `第${rounds.value.length + 1}轮聚类`,
+      method: method.value
+    }
+    
+    if (method.value === 'hdbscan') {
+      params.min_cluster_size = min_cluster_size.value
+      params.min_samples = min_samples.value
+      params.max_cluster_size = max_cluster_size.value
+    } else if (method.value === 'kmeans') {
+      params.n_clusters = n_clusters.value
+    }
+    
+    console.log('[Frontend] 将要发送的参数:', params)
+    
+    const res = await axios.post(`${API_BASE}/rounds`, params)
     if (res.data.code === 0) {
       alert(`第${res.data.round}轮聚类已启动！`)
       newRoundClusters.value = 100
@@ -294,6 +375,50 @@ onMounted(() => {
   border-radius: 8px;
 }
 
+.params-panel {
+  margin-bottom: 20px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.params-panel :deep(.ant-collapse) {
+  background: transparent;
+  border: none;
+}
+
+.params-panel :deep(.ant-collapse-item) {
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.params-panel :deep(.ant-collapse-item:last-child) {
+  border-bottom: none;
+}
+
+.params-panel :deep(.ant-collapse-header) {
+  padding: 12px 16px;
+  font-weight: bold;
+  background: #fafafa;
+}
+
+.params-panel :deep(.ant-collapse-content) {
+  padding: 16px;
+}
+
+.param-input {
+  width: 100px;
+  padding: 4px 11px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.param-input:focus {
+  outline: none;
+  border-color: #1890ff;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -355,5 +480,16 @@ onMounted(() => {
 .chars-display {
   font-size: 16px;
   font-weight: bold;
+}
+
+.char-tag {
+  display: inline-block;
+  background: #f0f5ff;
+  color: #1890ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-right: 4px;
+  margin-bottom: 4px;
 }
 </style>

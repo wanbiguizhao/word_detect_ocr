@@ -18,9 +18,7 @@
     <div class="stats-section">
       <div class="stats-row">
         <a-statistic title="已标注汉字" :value="totalChars" />
-        <a-statistic title="涉及聚类" :value="totalClusters" />
         <a-statistic title="标注图片" :value="totalImages" />
-        <a-statistic title="平均每字图片数" :value="avgImagesPerChar" />
       </div>
       
       <div class="stats-chart">
@@ -54,7 +52,6 @@
         <div class="char-display">{{ item.char }}</div>
         <div class="char-stats">
           <span>图片: {{ item.total_count }}</span>
-          <span>聚类: {{ item.cluster_count }}</span>
         </div>
       </div>
     </div>
@@ -63,7 +60,7 @@
       <div v-if="selectedCharData" class="detail-content">
         <div class="detail-header">
           <span class="selected-char">{{ selectedChar }}</span>
-          <span class="char-count">共 {{ selectedCharData.total_count }} 张图片，涉及 {{ selectedCharData.cluster_count }} 个聚类</span>
+          <span class="char-count">共 {{ selectedCharData.total_count }} 张图片</span>
         </div>
         
         <div class="tabs-container">
@@ -193,19 +190,8 @@ const recommendClusters = ref([])
 const charImages = ref([])
 
 const totalChars = computed(() => chars.value.length)
-const totalClusters = computed(() => {
-  const clusters = new Set()
-  chars.value.forEach(item => {
-    item.clusters.forEach(cid => clusters.add(cid))
-  })
-  return clusters.size
-})
 const totalImages = computed(() => {
   return chars.value.reduce((sum, item) => sum + item.total_count, 0)
-})
-const avgImagesPerChar = computed(() => {
-  if (totalChars.value === 0) return 0
-  return Math.round(totalImages.value / totalChars.value)
 })
 const topChars = computed(() => {
   return [...chars.value].sort((a, b) => b.total_count - a.total_count).slice(0, 10)
