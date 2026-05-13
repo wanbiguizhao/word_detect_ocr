@@ -1,0 +1,17 @@
+{
+  "dataset": {
+    "current": "pdf5826",
+    "source": "pdf01"
+  },
+  "labeling": {
+    "high_confidence_threshold": 0.9,
+    "low_confidence_threshold": 0.7
+  },
+  "clustering": {
+    "default_method": "arcface",
+    "supported_methods": ["arcface", "hog"]
+  },
+  "ocr": {
+    "model_path": "ocr_system/model_store/inference/ocr_model_best.pth"
+  }
+}
