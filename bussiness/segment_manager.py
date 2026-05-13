@@ -974,14 +974,14 @@ if __name__ == "__main__":
     data_base_path = base_dir / "bussiness"/"datahome"/ "pdf5823"
     pdf_path = data_base_path / "gwyb195823.pdf"
     run_segment(data_base_path, pdf_path)
-    print("\n" + "=" * 60)
-    print("开始聚类")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("开始聚类")
+    # print("=" * 60)
     
-    cluster_manager = ClusterManager(
-        input_dir=data_base_path / "pdf_chars",
-        output_dir=data_base_path / "clusters",
-        n_clusters=1000
-    )
-    cluster_manager.run()
+    # cluster_manager = ClusterManager(
+    #     input_dir=data_base_path / "pdf_chars",
+    #     output_dir=data_base_path / "clusters",
+    #     n_clusters=1000
+    # )
+    # cluster_manager.run()
     

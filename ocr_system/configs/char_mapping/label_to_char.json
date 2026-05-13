@@ -27173,6 +27173,14 @@
     "6892": {
       "char": "〇",
       "status": "custom"
+    },
+    "6893": {
+      "char": "测试",
+      "status": "custom"
+    },
+    "6894": {
+      "char": "%",
+      "status": "custom"
     }
   }
 }

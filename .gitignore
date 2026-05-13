@@ -188,3 +188,4 @@ pdf01_evaluation_results.json
 ocr_system.tar
 bussiness/migration/data/char_priority_list.json
 val_rel_stats.json
+datasets/ocr_dataset
