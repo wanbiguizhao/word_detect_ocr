@@ -105,35 +105,6 @@
           </div>
         </div>
 
-        <div class="feature-card" @click="goTo('/pseudo-label')">
-          <div class="feature-icon">
-            <span class="icon">🔍</span>
-          </div>
-          <h3 class="feature-title">伪标签传播</h3>
-          <p class="feature-desc">
-            利用已标记的数据，对未标记的聚类进行标签推荐和批量标注
-          </p>
-          <div class="feature-tags">
-            <a-tag color="cyan">半监督</a-tag>
-            <a-tag color="blue">标签传播</a-tag>
-          </div>
-        </div>
-
-        <div class="feature-card" @click="goTo('/char-management')">
-          <div class="feature-icon">
-            <span class="icon">📋</span>
-          </div>
-          <h3 class="feature-title">汉字管理</h3>
-          <p class="feature-desc">
-            管理已标注汉字，查看详情和标注情况
-          </p>
-          <div class="feature-tags">
-            <a-tag color="green">数据统计</a-tag>
-            <a-tag color="blue">汉字详情</a-tag>
-          </div>
-        </div>
-
-        
       </div>
     </div>
 

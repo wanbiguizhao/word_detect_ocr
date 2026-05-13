@@ -2,21 +2,21 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import List, Optional
 from pydantic import BaseModel
 import json
+import logging
 from pathlib import Path
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 from config import config, PROJECT_ROOT
 from labeling_task_manager import LabelingTaskManager
-from pseudo_label_generator import PseudoLabelGenerator
 from simple_char_clustering import SimpleCharClustering
 from datastore.stats_manager import StatsManager
 from datastore.data_store import DataStore
 
 task_manager = LabelingTaskManager(config._config)
-prelabel_generator = PseudoLabelGenerator(config._config)
 simple_clusterer = SimpleCharClustering(config._config)
-stats_manager = StatsManager(config.get("dataset.current", "pdf5823"))
+stats_manager = StatsManager(config.get("dataset.current", "pdf5826"))
 
 class CharStats(BaseModel):
     char: str
@@ -67,7 +67,7 @@ def get_labeling_stats():
     char_stats.sort(key=lambda x: x["total"], reverse=True)
     
     return {
-        "dataset": stats.get("dataset", config.get("dataset.current", "pdf5823")),
+        "dataset": stats.get("dataset", config.get("dataset.current", "pdf5826")),
         "total_images": stats.get("total_images", 0),
         "labeled_count": stats.get("labeled_count", 0),
         "prelabeled_count": stats.get("total_images", 0) - stats.get("unlabeled_count", 0),
@@ -76,14 +76,18 @@ def get_labeling_stats():
     }
 
 @router.get("/api/labeling/char-list")
-def get_char_list(page: int = 1, page_size: int = 20, search: Optional[str] = None, dataset: str = "pdf5823", sort_by: Optional[str] = None, sort_order: str = "desc"):
+def get_char_list(page: int = 1, page_size: int = 20, search: Optional[str] = None, dataset: Optional[str] = None, sort_by: Optional[str] = None, sort_order: str = "desc"):
     # 使用数据抽象层
     global stats_manager
+    if dataset is None:
+        dataset = config.get("dataset.current", "pdf5826")
     stats_manager = StatsManager(dataset)
     return stats_manager.get_char_list(page, page_size, search, sort_by, sort_order)
 
 @router.get("/api/labeling/prelabels/{char}")
-def get_char_prelabels(char: str, page: int = 1, page_size: int = 20, confidence_min: Optional[float] = None, dataset: str = "pdf5823"):
+def get_char_prelabels(char: str, page: int = 1, page_size: int = 20, confidence_min: Optional[float] = None, dataset: Optional[str] = None):
+    if dataset is None:
+        dataset = config.get("dataset.current", "pdf5826")
     prelabels_path = PROJECT_ROOT / "bussiness" / "datahome" / dataset / "pre_labels.json"
     lineage_path = PROJECT_ROOT / "bussiness" / "datahome" / dataset / "lineage.json"
 
@@ -148,7 +152,7 @@ def get_char_prelabels(char: str, page: int = 1, page_size: int = 20, confidence
 @router.post("/api/labeling/confirm")
 def simple_confirm(request: SimpleConfirmRequest):
     global stats_manager
-    dataset = config.get("dataset.current", "pdf5823")
+    dataset = config.get("dataset.current", "pdf5826")
     stats_manager = StatsManager(dataset)
     stats_manager.confirm_annotation(request.char_id, request.char)
 
@@ -160,7 +164,7 @@ def simple_confirm(request: SimpleConfirmRequest):
 @router.post("/api/labeling/modify")
 def simple_modify(request: SimpleModifyRequest):
     global stats_manager
-    dataset = config.get("dataset.current", "pdf5823")
+    dataset = config.get("dataset.current", "pdf5826")
     stats_manager = StatsManager(dataset)
     stats_manager.confirm_annotation(request.char_id, request.char)
 
@@ -172,9 +176,23 @@ def simple_modify(request: SimpleModifyRequest):
 @router.post("/api/labeling/confirm/batch")
 def batch_confirm(request: BatchConfirmRequest):
     global stats_manager
-    dataset = config.get("dataset.current", "pdf5823")
+    
+    logger.info(f"[Labeling Router] batch_confirm called")
+    try:
+        logger.debug(f"[Labeling Router] Request items count: {len(request.items)}")
+        if request.items:
+            logger.debug(f"[Labeling Router] First item: {request.items[0]}")
+    except Exception as e:
+        logger.warning(f"[Labeling Router] Failed to log request items: {e}")
+    
+    dataset = config.get("dataset.current", "pdf5826")
+    logger.debug(f"[Labeling Router] Current dataset: {dataset}")
+    
     stats_manager = StatsManager(dataset)
+    logger.debug(f"[Labeling Router] StatsManager initialized with dataset: {stats_manager.dataset_id}")
+    
     results = stats_manager.batch_confirm_annotations(request.items)
+    logger.info(f"[Labeling Router] Batch confirm completed - success: {results['success_count']}/{results['total_count']}")
 
     return {
         "code": 0,
@@ -333,7 +351,7 @@ def run_clustering(min_samples: int = 3):
 @router.get("/api/labeling/sync/logs")
 def get_sync_logs(limit: int = 100, date: Optional[str] = None):
     """获取同步日志"""
-    dataset = config.get("dataset.current", "pdf5823")
+    dataset = config.get("dataset.current", "pdf5826")
     store = DataStore(dataset)
     
     if date:
@@ -352,7 +370,7 @@ def get_sync_logs(limit: int = 100, date: Optional[str] = None):
 @router.get("/api/labeling/sync/logs/today")
 def get_today_sync_logs():
     """获取今日同步日志"""
-    dataset = config.get("dataset.current", "pdf5823")
+    dataset = config.get("dataset.current", "pdf5826")
     store = DataStore(dataset)
     logs = store.get_today_sync_logs()
     
@@ -367,7 +385,7 @@ def get_today_sync_logs():
 @router.get("/api/labeling/sync/stats")
 def get_sync_statistics():
     """获取同步统计信息"""
-    dataset = config.get("dataset.current", "pdf5823")
+    dataset = config.get("dataset.current", "pdf5826")
     store = DataStore(dataset)
     stats = store.get_sync_statistics()
     

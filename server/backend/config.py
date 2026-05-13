@@ -13,14 +13,14 @@ class ConfigManager:
         return cls._instance
     
     def _load_config(self):
-        config_path = Path(__file__).parent.parent.parent / "bussiness" / "config.json"
+        config_path = Path(__file__).parent / "config.json"
         if config_path.exists():
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._config = json.load(f)
         else:
             self._config = {
                 "dataset": {
-                    "current": "pdf5823",
+                    "current": "pdf5826",
                     "source": "pdf01"
                 },
                 "labeling": {
@@ -53,7 +53,7 @@ config = ConfigManager()
 BASE_DIR = Path(__file__).parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 
-DATASET_ID = config.get("dataset.current", "pdf5823")
+DATASET_ID = config.get("dataset.current", "pdf5826")
 SOURCE_DATASET_ID = config.get("dataset.source", "pdf01")
 
 DATAHOME_DIR = PROJECT_ROOT / "bussiness" / "datahome"
@@ -90,7 +90,3 @@ CHAR_MIGRATION_MAP_PATH = MIGRATION_DIR / "char_migration_map.json"
 CHAR_PRIORITY_LIST_PATH = MIGRATION_DIR / "char_priority_list.json"
 GLOBAL_CHAR_REGISTRY_PATH = MIGRATION_DIR / "global_char_registry.json"
 
-PSEUDO_LABEL_CACHE_PATH = MIGRATION_DIR / "pseudo_label_cache.json"
-
-pseudo_label_cache = {}
-executor = ThreadPoolExecutor(max_workers=4)

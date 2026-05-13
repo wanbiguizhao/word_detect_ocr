@@ -3,7 +3,7 @@ import json
 from collections import Counter
 from fastapi import APIRouter, HTTPException
 from sklearn.metrics.pairwise import cosine_similarity
-from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, SOURCE_DATASET_ID, pseudo_label_cache, DATASET_DIR
+from config import CLUSTERS_JSON, LABELS_JSON, PROJECT_ROOT, SOURCE_DATASET_ID, DATASET_DIR
 from models import BatchLabelSave, ClusterLabelSave
 from utils import load_json_file, extract_hog_features, get_labeled_clusters_info
 
@@ -273,14 +273,6 @@ def batch_save_cluster_labels(body: BatchLabelSave):
         unified_data["annotations"] = annotations
         with open(unified_labels_path, 'w', encoding='utf-8') as f:
             json.dump(unified_data, f, ensure_ascii=False, indent=2)
-
-    for item in body.labels:
-        char = item.char
-        if char in pseudo_label_cache:
-            if cluster_id in pseudo_label_cache[char]:
-                del pseudo_label_cache[char][cluster_id]
-                if len(pseudo_label_cache[char]) == 0:
-                    del pseudo_label_cache[char]
 
     new_chars_list = sorted(list(new_chars))
     return {

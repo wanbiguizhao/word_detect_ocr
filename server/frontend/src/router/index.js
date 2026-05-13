@@ -5,10 +5,7 @@ import LabelPage from '../views/LabelPage.vue'
 import OcrLabelPage from '../views/OcrLabelPage.vue'
 import OcrClusterLabelPage from '../views/OcrClusterLabelPage.vue'
 import OcrClusterEditPage from '../views/OcrClusterEditPage.vue'
-import PseudoLabelListPage from '../views/PseudoLabelListPage.vue'
-import PseudoLabelDetailPage from '../views/PseudoLabelDetailPage.vue'
 import PreLabelConfirmPage from '../views/PreLabelConfirmPage.vue'
-import CharManagementPage from '../views/CharManagementPage.vue'
 import LineCheckPage from '../views/LineCheckPage.vue'
 import LineDetailPage from '../views/LineDetailPage.vue'
 
@@ -24,10 +21,7 @@ const routes = [
   { path: '/ocr', name: 'ocr', component: OcrLabelPage },
   { path: '/ocr-label/:id', name: 'ocr-label', component: OcrClusterLabelPage },
   { path: '/ocr-edit/:id', name: 'ocr-edit', component: OcrClusterEditPage },
-  { path: '/pseudo-label', name: 'pseudo-label', component: PseudoLabelListPage },
-  { path: '/pseudo-label/:char', name: 'pseudo-label-detail', component: PseudoLabelDetailPage },
   { path: '/prelabel-confirm/:char', name: 'prelabel-confirm', component: PreLabelConfirmPage },
-  { path: '/char-management', name: 'char-management', component: CharManagementPage },
   { path: '/line-check', name: 'line-check', component: LineCheckPage },
   { path: '/line-detail/:lineName', name: 'line-detail', component: LineDetailPage },
   

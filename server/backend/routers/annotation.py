@@ -9,8 +9,7 @@ from config import (
     DATASET_DIR,
     ANNOTATIONS_DIR,
     CLUSTERS_JSON,
-    LABELS_JSON,
-    executor
+    LABELS_JSON
 )
 
 from utils import load_json_file
