@@ -104,6 +104,22 @@ class SyncLogger:
             message=message
         )
     
+    def log_batch_write_annotations(self, success_count: int, total_count: int, elapsed_time: float):
+        """记录批量写入操作"""
+        self.log(
+            operation="batch_write_annotations",
+            char_id="",
+            char="",
+            target="batch",
+            status="success" if success_count == total_count else "partial",
+            message=f"批量写入完成: {success_count}/{total_count} 条, 耗时: {elapsed_time:.2f}秒",
+            details={
+                "success_count": success_count,
+                "total_count": total_count,
+                "elapsed_time": elapsed_time
+            }
+        )
+    
     def log_sync_skipped(self, char_id: str, char: str, reason: str = ""):
         """记录跳过的同步操作"""
         self.log(

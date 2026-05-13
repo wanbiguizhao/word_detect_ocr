@@ -1,9 +1,10 @@
-"""统计数据管理器"""
+"""统计数据管理器 - 使用统一数据存储抽象层"""
 import logging
 from typing import Optional
 from .data_store import DataStore
 
 logger = logging.getLogger(__name__)
+
 
 class StatsManager:
     _instance = None
@@ -25,7 +26,6 @@ class StatsManager:
         stats = self.get_stats()
         char_stats = stats.get("char_stats", {})
         
-        # 转换为列表
         char_list = [
             {
                 "char": char,
@@ -36,18 +36,15 @@ class StatsManager:
             for char, info in char_stats.items()
         ]
         
-        # 搜索过滤
         if search:
             char_list = [c for c in char_list if search in c["char"]]
         
-        # 排序
         if sort_by and sort_by in ["total", "confirmed", "pending"]:
             reverse = sort_order == "desc"
             char_list.sort(key=lambda x: x[sort_by], reverse=reverse)
         else:
             char_list.sort(key=lambda x: x["total"], reverse=True)
         
-        # 分页
         total = len(char_list)
         start = (page - 1) * page_size
         end = start + page_size
@@ -81,7 +78,6 @@ class StatsManager:
             char_labels = cluster_labels.get("char_labels", {})
             labeled_chars += sum(1 for v in char_labels.values() if v.get("char"))
             
-            # 加上已确认的标注
             for char in chars:
                 if char.get("confirmed"):
                     labeled_chars += 1
@@ -94,51 +90,49 @@ class StatsManager:
             "unlabeled_chars": total_chars - labeled_chars
         }
     
-    def confirm_annotation(self, char_id: str, char: str):
-        """确认标注（更新多个数据源）"""
-        logger.debug(f"[StatsManager] confirm_annotation called - dataset: {self.dataset_id}, char_id: {char_id}, char: {char}")
+    def confirm_annotation(self, char_id: str, char: str, source: str = "ocr_confirm"):
+        """确认标注（通过统一接口更新所有数据源）"""
+        #logger.debug(f"[StatsManager] confirm_annotation - dataset: {self.dataset_id}, char_id: {char_id}, char: {char}")
         
-        # 优先更新统一标注（核心数据）
-        self.data_store.update_unified_label(char_id, {
-            "char": char,
-            "status": "labeled"
-        })
-        logger.debug(f"[StatsManager] Unified label updated")
-
-        # 尝试更新预标注状态（可选，失败不影响核心流程）
-        try:
-            self.data_store.update_prelabel_status(char_id, "confirmed", char)
-            logger.debug(f"[StatsManager] Prelabel status updated")
-        except Exception as e:
-            logger.warning(f"[StatsManager] Failed to update prelabel status (non-critical): {e}")
-
-        self.data_store.invalidate_cache()
+        # 使用统一写入接口，自动同步所有数据源
+        self.data_store.write_annotation(
+            char_id=char_id,
+            char=char,
+            status="labeled",
+            source=source,
+            changed_by="user",
+            comment="OCR预标注确认"
+        )
+        
         logger.debug(f"[StatsManager] confirm_annotation completed - char_id: {char_id}")
     
-    def batch_confirm_annotations(self, annotations: list):
-        """批量确认标注"""
-        logger.debug(f"[StatsManager] batch_confirm_annotations called - dataset: {self.dataset_id}, count: {len(annotations)}")
-
-        success_count = 0
-        total_count = len(annotations)
-
-        for ann in annotations:
-            try:
-                # ann 是 SimpleConfirmRequest 对象，需要用属性访问
-                char_id = ann.char_id if hasattr(ann, 'char_id') else ann['char_id']
-                char = ann.char if hasattr(ann, 'char') else ann['char']
-                self.confirm_annotation(char_id, char)
-                success_count += 1
-            except Exception as e:
-                logger.error(f"[StatsManager] Failed to confirm annotation: char_id='{char_id}' char='{char}', error: {e}")
-
-        logger.debug(f"[StatsManager] batch_confirm_annotations completed - success: {success_count}/{total_count}")
-
-        return {
-            "success_count": success_count,
-            "total_count": total_count
-        }
+    def batch_confirm_annotations(self, annotations: list) -> dict:
+        """批量确认标注（使用批量写入优化性能）"""
+        logger.debug(f"[StatsManager] batch_confirm_annotations - dataset: {self.dataset_id}, count: {len(annotations)}")
+        
+        try:
+            # 使用批量写入方法大幅提升性能
+            results = self.data_store.batch_write_annotations(
+                annotations=annotations,
+                source="ocr_confirm",
+                changed_by="user",
+                comment="OCR预标注确认"
+            )
+            
+            logger.debug(f"[StatsManager] batch_confirm_annotations completed - success: {results['success_count']}/{results['total_count']}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"[StatsManager] batch_confirm_annotations failed: {e}")
+            return {
+                "success_count": 0,
+                "total_count": len(annotations)
+            }
     
     def refresh_cache(self):
         """刷新缓存"""
         self.data_store.invalidate_cache()
+    
+    def get_label_history(self, char_id: Optional[str] = None, limit: int = 100) -> list:
+        """获取标注历史记录"""
+        return self.data_store.get_label_history(char_id, limit)
