@@ -305,9 +305,9 @@ const handleViewPrelabels = (char) => {
 };
 
 const lastRefreshTime = ref('');
-const refreshData = () => {
-  fetchStats();
-  fetchCharList();
+const refreshData = async () => {
+  await fetchStats();
+  await fetchCharList();
   lastRefreshTime.value = new Date().toLocaleString('zh-CN');
 };
 

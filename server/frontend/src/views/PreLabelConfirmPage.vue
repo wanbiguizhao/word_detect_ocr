@@ -145,6 +145,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { message } from 'ant-design-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -365,9 +366,15 @@ const confirmBatch = async () => {
         const confB = b.confidence || 0
         return confA - confB
       })
+      
+      const successCount = res.data.success_count || selectedItems.value.length
+      message.success(`✓ 批量确认成功！已确认 ${successCount} 个标注`)
+    } else {
+      message.error('批量确认失败: ' + (res.data.msg || '未知错误'))
     }
   } catch (err) {
     console.error('批量确认标注失败:', err)
+    message.error('批量确认失败，请稍后重试')
   }
   
   selectedItems.value = []
