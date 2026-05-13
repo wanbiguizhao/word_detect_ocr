@@ -222,11 +222,11 @@ async def get_char_image(image_name: str):
     possible_dirs = [
         DATASET_DIR / "pdf_chars",
         PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars",
-        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823" / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / DATASET_ID / "pdf_chars",
         DATASET_DIR / "clusters" / "char_images",
         DATASET_DIR,
         PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID,
-        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823",
+        PROJECT_ROOT / "bussiness" / "datahome" / DATASET_ID,
     ]
 
     for char_dir in possible_dirs:
@@ -328,7 +328,7 @@ async def get_char_image_from_pdf_chars(char_id: str):
     possible_dirs = [
         DATASET_DIR / "pdf_chars",
         PROJECT_ROOT / "bussiness" / "datahome" / SOURCE_DATASET_ID / "pdf_chars",
-        PROJECT_ROOT / "bussiness" / "datahome" / "pdf5823" / "pdf_chars",
+        PROJECT_ROOT / "bussiness" / "datahome" / DATASET_ID / "pdf_chars",
     ]
 
     for char_dir in possible_dirs:

@@ -8,7 +8,7 @@ import cv2
 class ArcFaceClustering:
     def __init__(self, config):
         self.config = config
-        self.dataset_id = config.get("dataset.current", "pdf5823")
+        self.dataset_id = config.get("dataset.current", "pdf5826")
         self.source_dataset_id = config.get("dataset.source", "pdf01")
         
         self.project_root = Path(__file__).parent.parent.parent
