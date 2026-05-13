@@ -347,7 +347,7 @@ class DataSync:
 
 def main():
     parser = argparse.ArgumentParser(description="数据同步脚本（安全模式）")
-    parser.add_argument("--dataset", "-d", default="pdf5823", help="数据集ID")
+    parser.add_argument("--dataset", "-d", default="pdf5826", help="数据集ID")
     parser.add_argument("--all", "-a", action="store_true", help="同步所有数据集")
     parser.add_argument("--dry-run", "-n", action="store_true", help="模拟运行，不实际修改文件")
     parser.add_argument("--no-backup", action="store_true", help="不备份文件")

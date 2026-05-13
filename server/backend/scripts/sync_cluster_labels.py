@@ -3,7 +3,7 @@ import json
 import datetime
 from pathlib import Path
 
-def sync_cluster_labels(dataset_id: str = "pdf5823"):
+def sync_cluster_labels(dataset_id: str = "pdf5826"):
     project_root = Path("d:/projects/word_detect_ocr")
     dataset_dir = project_root / "bussiness" / "datahome" / dataset_id
     
@@ -102,4 +102,4 @@ def sync_cluster_labels(dataset_id: str = "pdf5823"):
     print(f"   - 已存在跳过: {skipped_count}")
 
 if __name__ == "__main__":
-    sync_cluster_labels("pdf5823")
+    sync_cluster_labels("pdf5826")

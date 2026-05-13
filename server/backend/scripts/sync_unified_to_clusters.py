@@ -3,7 +3,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-def sync_unified_to_clusters(dataset_id: str = "pdf5823"):
+def sync_unified_to_clusters(dataset_id: str = "pdf5826"):
     project_root = Path("d:/projects/word_detect_ocr")
     dataset_dir = project_root / "bussiness" / "datahome" / dataset_id
     
@@ -113,4 +113,4 @@ def sync_unified_to_clusters(dataset_id: str = "pdf5823"):
     print("   - 更新的字符数: {}".format(updated_chars))
 
 if __name__ == "__main__":
-    sync_unified_to_clusters("pdf5823")
+    sync_unified_to_clusters("pdf5826")

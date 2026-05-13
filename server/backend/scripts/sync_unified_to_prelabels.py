@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-def sync_unified_to_prelabels(dataset_id: str = "pdf5823"):
+def sync_unified_to_prelabels(dataset_id: str = "pdf5826"):
     project_root = Path("d:/projects/word_detect_ocr")
     dataset_dir = project_root / "bussiness" / "datahome" / dataset_id
     
@@ -67,4 +67,4 @@ def sync_unified_to_prelabels(dataset_id: str = "pdf5823"):
     print("   - 已确认跳过: {}".format(skipped_count))
 
 if __name__ == "__main__":
-    sync_unified_to_prelabels("pdf5823")
+    sync_unified_to_prelabels("pdf5826")
