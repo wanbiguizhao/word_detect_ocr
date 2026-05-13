@@ -1,8 +1,11 @@
 """统一数据存储抽象层"""
 import json
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 class DataStore:
     def __init__(self, dataset_id: Optional[str] = None):
@@ -23,9 +26,8 @@ class DataStore:
         # 多轮聚类路径
         self.multi_clustering_dir = self.dataset_dir / "multi_clustering"
         
-        # 回退路径（兼容旧数据结构）
-        self.fallback_unified_labels = self.project_root / "bussiness" / "unified_labels.json"
-        self.fallback_prelabels = self.project_root / "bussiness" / "pre_labels.json"
+        # 自动初始化统一标注文件（确保每个数据集有独立的标注文件）
+        self._init_unified_labels()
         
         # 缓存（按数据集隔离）
         self._cache = {}
@@ -99,6 +101,17 @@ class DataStore:
         if path.exists():
             self._last_modified[cache_key] = path.stat().st_mtime
     
+    def _init_unified_labels(self):
+        """初始化数据集的统一标注文件（如果不存在）"""
+        if not self.unified_labels_path.exists():
+            init_data = {
+                "dataset": self.dataset_id,
+                "total_labeled": 0,
+                "char_distribution": {},
+                "annotations": []
+            }
+            self._save_file(self.unified_labels_path, init_data)
+    
     def invalidate_cache(self):
         """清除所有缓存"""
         self._cache.clear()
@@ -119,8 +132,8 @@ class DataStore:
     # ==================== 预标注数据 ====================
     
     def get_prelabels(self, char: Optional[str] = None) -> list:
-        """获取预标注数据"""
-        data = self._load_file(self.prelabels_path, self.fallback_prelabels)
+        """获取预标注数据（仅从当前数据集读取）"""
+        data = self._load_file(self.prelabels_path)
         prelabels = data.get("prelabels", [])
         
         if char:
@@ -128,32 +141,53 @@ class DataStore:
         return prelabels
     
     def get_prelabel_stats(self) -> dict:
-        """获取预标注统计"""
-        data = self._load_file(self.prelabels_path, self.fallback_prelabels)
+        """获取预标注统计（仅从当前数据集读取）"""
+        data = self._load_file(self.prelabels_path)
         return {
             "total": data.get("stats", {}).get("total", 0),
             "char_counts": data.get("char_counts", {})
         }
     
     def update_prelabel_status(self, char_id: str, status: str, char: str = None):
-        """更新预标注状态"""
-        data = self._load_file(self.prelabels_path, self.fallback_prelabels)
-        prelabels = data.get("prelabels", [])
+        """更新预标注状态（仅操作当前数据集）"""
+        logger.debug(f"[DataStore] update_prelabel_status called - char_id: {char_id}, status: {status}, char: {char}")
+        logger.debug(f"[DataStore] prelabels_path: {self.prelabels_path}")
+        
+        try:
+            # 强制重新加载，不使用缓存
+            cache_key = str(self.prelabels_path)
+            if cache_key in self._cache:
+                del self._cache[cache_key]
+                logger.debug(f"[DataStore] Removed cache for prelabels")
+            
+            data = self._load_file(self.prelabels_path)
+            logger.debug(f"[DataStore] Loaded prelabels data keys: {list(data.keys())}")
+            
+            prelabels = data.get("prelabels", [])
+            logger.debug(f"[DataStore] prelabels count: {len(prelabels)}")
+            
+            if len(prelabels) == 0:
+                logger.warning(f"[DataStore] No prelabels found for char_id: {char_id}")
 
-        for prelabel in prelabels:
-            if prelabel.get("char_id") == char_id:
-                prelabel["status"] = status
-                if char is not None:
-                    prelabel["predicted_char"] = char
-                break
+            for prelabel in prelabels:
+                if prelabel.get("char_id") == char_id:
+                    prelabel["status"] = status
+                    if char is not None:
+                        prelabel["predicted_char"] = char
+                    logger.debug(f"[DataStore] Updated prelabel: {prelabel}")
+                    break
 
-        self._save_file(self.prelabels_path, data)
+            self._save_file(self.prelabels_path, data)
+            logger.debug(f"[DataStore] prelabel status updated successfully")
+        except Exception as e:
+            logger.error(f"[DataStore] Failed to update prelabel status: {e}", exc_info=True)
+            raise
     
     # ==================== 统一标注数据 ====================
     
     def get_unified_labels(self, status: Optional[str] = None) -> list:
-        """获取统一标注数据"""
-        data = self._load_file(self.unified_labels_path, self.fallback_unified_labels)
+        """获取统一标注数据（仅从当前数据集读取）"""
+        data = self._load_file(self.unified_labels_path)
         annotations = data.get("annotations", [])
         
         if status:
@@ -161,8 +195,8 @@ class DataStore:
         return annotations
     
     def add_unified_label(self, annotation: dict):
-        """添加统一标注"""
-        data = self._load_file(self.unified_labels_path, self.fallback_unified_labels)
+        """添加统一标注（仅写入当前数据集）"""
+        data = self._load_file(self.unified_labels_path)
         
         if "annotations" not in data:
             data["annotations"] = []
@@ -171,21 +205,36 @@ class DataStore:
         self._save_file(self.unified_labels_path, data)
     
     def update_unified_label(self, char_id: str, updates: dict):
-        """更新统一标注，如果不存在则添加"""
-        data = self._load_file(self.unified_labels_path, self.fallback_unified_labels)
-        annotations = data.get("annotations", [])
-
+        """更新统一标注，如果不存在则添加（仅操作当前数据集）"""
+        logger.debug(f"[DataStore] update_unified_label called - dataset: {self.dataset_id}, char_id: {char_id}, updates: {updates}")
+        
+        data = self._load_file(self.unified_labels_path)
+        logger.debug(f"[DataStore] Loaded data: {json.dumps(data, ensure_ascii=False)[:200]}...")
+        
+        if "annotations" not in data:
+            data["annotations"] = []
+            logger.debug("[DataStore] Created new annotations list")
+        
+        annotations = data["annotations"]
         found = False
+        
         for ann in annotations:
             if ann.get("char_id") == char_id:
                 ann.update(updates)
+                if "dataset" not in ann:
+                    ann["dataset"] = self.dataset_id
                 found = True
+                logger.debug(f"[DataStore] Found existing annotation, updated: {ann}")
                 break
-
+        
         if not found:
-            annotations.append({"char_id": char_id, **updates})
-
+            new_ann = {"char_id": char_id, "dataset": self.dataset_id, **updates}
+            annotations.append(new_ann)
+            logger.debug(f"[DataStore] Created new annotation: {new_ann}")
+        
+        logger.debug(f"[DataStore] Saving to: {self.unified_labels_path}")
         self._save_file(self.unified_labels_path, data)
+        logger.debug(f"[DataStore] Annotation saved successfully")
     
     def get_confirmed_annotations(self) -> Dict[str, str]:
         """获取已确认的标注（char_id -> char）"""
@@ -365,7 +414,8 @@ class DataStore:
         char_counts = prelabel_stats["char_counts"]
         
         annotations = self.get_unified_labels()
-        labeled_count = len([a for a in annotations if a.get("status") == "labeled"])
+        dataset_annotations = [a for a in annotations if a.get("dataset") == self.dataset_id or not a.get("dataset")]
+        labeled_count = len([a for a in dataset_annotations if a.get("status") == "labeled"])
         
         char_stats = {}
         for char, counts in char_counts.items():
@@ -375,7 +425,7 @@ class DataStore:
                 "pending": counts.get("total", 0)
             }
         
-        for ann in annotations:
+        for ann in dataset_annotations:
             char = ann.get("char")
             if char and char in char_stats:
                 if ann.get("status") == "labeled":

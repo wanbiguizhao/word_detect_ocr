@@ -1,6 +1,9 @@
 """统计数据管理器"""
+import logging
 from typing import Optional
 from .data_store import DataStore
+
+logger = logging.getLogger(__name__)
 
 class StatsManager:
     _instance = None
@@ -8,7 +11,7 @@ class StatsManager:
     def __new__(cls, dataset_id: Optional[str] = None):
         if cls._instance is None or (dataset_id and cls._instance.dataset_id != dataset_id):
             cls._instance = super().__new__(cls)
-            cls._instance.dataset_id = dataset_id or "pdf5823"
+            cls._instance.dataset_id = dataset_id or "pdf5826"
             cls._instance.data_store = DataStore(cls._instance.dataset_id)
         return cls._instance
     
@@ -93,19 +96,48 @@ class StatsManager:
     
     def confirm_annotation(self, char_id: str, char: str):
         """确认标注（更新多个数据源）"""
+        logger.debug(f"[StatsManager] confirm_annotation called - dataset: {self.dataset_id}, char_id: {char_id}, char: {char}")
+        
+        # 优先更新统一标注（核心数据）
         self.data_store.update_unified_label(char_id, {
             "char": char,
             "status": "labeled"
         })
+        logger.debug(f"[StatsManager] Unified label updated")
 
-        self.data_store.update_prelabel_status(char_id, "confirmed", char)
+        # 尝试更新预标注状态（可选，失败不影响核心流程）
+        try:
+            self.data_store.update_prelabel_status(char_id, "confirmed", char)
+            logger.debug(f"[StatsManager] Prelabel status updated")
+        except Exception as e:
+            logger.warning(f"[StatsManager] Failed to update prelabel status (non-critical): {e}")
 
         self.data_store.invalidate_cache()
+        logger.debug(f"[StatsManager] confirm_annotation completed - char_id: {char_id}")
     
     def batch_confirm_annotations(self, annotations: list):
         """批量确认标注"""
+        logger.debug(f"[StatsManager] batch_confirm_annotations called - dataset: {self.dataset_id}, count: {len(annotations)}")
+
+        success_count = 0
+        total_count = len(annotations)
+
         for ann in annotations:
-            self.confirm_annotation(ann["char_id"], ann["char"])
+            try:
+                # ann 是 SimpleConfirmRequest 对象，需要用属性访问
+                char_id = ann.char_id if hasattr(ann, 'char_id') else ann['char_id']
+                char = ann.char if hasattr(ann, 'char') else ann['char']
+                self.confirm_annotation(char_id, char)
+                success_count += 1
+            except Exception as e:
+                logger.error(f"[StatsManager] Failed to confirm annotation: char_id='{char_id}' char='{char}', error: {e}")
+
+        logger.debug(f"[StatsManager] batch_confirm_annotations completed - success: {success_count}/{total_count}")
+
+        return {
+            "success_count": success_count,
+            "total_count": total_count
+        }
     
     def refresh_cache(self):
         """刷新缓存"""
