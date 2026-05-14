@@ -494,14 +494,18 @@ const confirmBatch = async () => {
   try {
     const res = await axios.post('/api/labeling/confirm/batch', { items: itemsData })
     if (res.data.code === 0) {
-      itemsToConfirm.forEach(item => {
-        const idx = prelabels.value.findIndex(p => p.char_id === item.char_id)
-        if (idx > -1) {
-          prelabels.value[idx].status = 'confirmed'
-        }
-      })
-      const successCount = res.data.success_count || itemsToConfirm.length
-      message.success(`✓ 批量确认成功！已确认 ${successCount} 个标注`)
+      const successCount = res.data.success_count ?? 0
+      if (successCount > 0) {
+        itemsToConfirm.forEach(item => {
+          const idx = prelabels.value.findIndex(p => p.char_id === item.char_id)
+          if (idx > -1) {
+            prelabels.value[idx].status = 'confirmed'
+          }
+        })
+        message.success(`✓ 批量确认成功！已确认 ${successCount} 个标注`)
+      } else {
+        message.warning('批量确认失败，无标注被确认')
+      }
     } else {
       message.error('批量确认失败: ' + (res.data.msg || '未知错误'))
     }

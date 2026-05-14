@@ -18,10 +18,10 @@
       </div>
       
       <div class="stat-card">
-        <div class="stat-icon prelabeled">🔄</div>
+        <div class="stat-icon pending">🔄</div>
         <div class="stat-content">
-          <div class="stat-value">{{ stats.prelabeled_count }}</div>
-          <div class="stat-label">预标注</div>
+          <div class="stat-value">{{ stats.pending_count }}</div>
+          <div class="stat-label">待确认</div>
         </div>
       </div>
       
@@ -30,6 +30,14 @@
         <div class="stat-content">
           <div class="stat-value">{{ stats.unlabeled_count }}</div>
           <div class="stat-label">未标注</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon skipped">⏭️</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.skipped_count ?? 0 }}</div>
+          <div class="stat-label">已跳过</div>
         </div>
       </div>
     </div>
@@ -79,7 +87,7 @@
             <tr>
               <th>汉字</th>
               <th>总数</th>
-              <th>已确认</th>
+              <th>已标注</th>
               <th>
                 <button 
                   @click="toggleSort('pending')"
@@ -100,7 +108,7 @@
             >
               <td class="char-cell">{{ item.char }}</td>
               <td>{{ item.total }}</td>
-              <td>{{ item.confirmed }}</td>
+              <td>{{ item.labeled }}</td>
               <td>{{ item.pending }}</td>
               <td>
                 <button 
@@ -156,7 +164,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 const stats = ref({
   total_images: 0,
   labeled_count: 0,
-  prelabeled_count: 0,
+  pending_count: 0,
+  skipped_count: 0,
   unlabeled_count: 0,
   char_stats: []
 });
@@ -234,7 +243,7 @@ const handleSizeChange = (size) => {
 
 const fetchStats = async () => {
   try {
-    const response = await fetch('/api/labeling/stats');
+    const response = await fetch('/api/labeling/stats?refresh=true');
     const data = await response.json();
     stats.value = data;
   } catch (error) {
@@ -325,7 +334,7 @@ onMounted(() => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 20px;
   margin-bottom: 24px;
 }
@@ -352,8 +361,9 @@ onMounted(() => {
 
 .stat-icon.total { background: #e0f2fe; }
 .stat-icon.labeled { background: #dcfce7; }
-.stat-icon.prelabeled { background: #fef9c3; }
+.stat-icon.pending { background: #fef9c3; }
 .stat-icon.unlabeled { background: #fce7f3; }
+.stat-icon.skipped { background: #f5f5f5; }
 
 .stat-content {
   flex: 1;
