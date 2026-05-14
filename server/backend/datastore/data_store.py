@@ -421,6 +421,24 @@ class DataStore:
         self._prelabel_status_dirty = True
         self._flush_prelabel_status()
     
+    def skip_prelabel(self, char_id: str):
+        """标记预标注为跳过"""
+        if "status" not in self._prelabel_status:
+            self._prelabel_status["status"] = {}
+        self._prelabel_status["status"][char_id] = "skipped"
+        self._prelabel_status["updated_at"] = datetime.datetime.now().isoformat()
+        self._prelabel_status_dirty = True
+        self._flush_prelabel_status()
+    
+    def reset_prelabel(self, char_id: str):
+        """重置预标注状态为 pending"""
+        if "status" not in self._prelabel_status:
+            self._prelabel_status["status"] = {}
+        self._prelabel_status["status"][char_id] = "pending"
+        self._prelabel_status["updated_at"] = datetime.datetime.now().isoformat()
+        self._prelabel_status_dirty = True
+        self._flush_prelabel_status()
+    
     def correct_prelabel_char(self, char_id: str, new_char: str):
         """修正OCR预测字符"""
         if "corrected_chars" not in self._prelabel_status:

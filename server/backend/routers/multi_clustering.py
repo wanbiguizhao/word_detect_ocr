@@ -14,6 +14,9 @@ class LabelItem(BaseModel):
 class BatchLabelSave(BaseModel):
     labels: List[LabelItem]
 
+class BatchSkipRequest(BaseModel):
+    char_ids: List[str]
+
 class NewRoundRequest(BaseModel):
     data_source: Optional[str] = "unlabeled"
     method: Optional[str] = "hdbscan"
@@ -165,20 +168,36 @@ def get_cluster_detail(round_num: int, cluster_id: str):
 
         cluster_labels = labels.get("labels", {}).get(cluster_id, {}) if labels else {}
 
-        # 构建字符详情
+        all_chars = manager.char_pool.load_all_chars()
+
         char_details = []
         for idx, char_info in enumerate(cluster_chars):
             char_key = str(idx)
             char_label = cluster_labels.get("char_labels", {}).get(char_key, {})
+            char_id = char_info.get("char_id", "")
+            char_status = all_chars.get(char_id, {}).get("status", "unlabeled")
+
+            prelabel = manager.data_store.get_prelabel_by_char_id(char_id)
+            predicted_char = None
+            confidence = None
+            confidence_level = None
+            if prelabel:
+                predicted_char = prelabel.get("predicted_char")
+                confidence = prelabel.get("confidence")
+                confidence_level = prelabel.get("confidence_level")
 
             char_details.append({
                 "index": idx,
-                "char_id": char_info.get("char_id", ""),
+                "char_id": char_id,
                 "line_name": char_info.get("line_name", ""),
                 "col_start": char_info.get("col_start", 0),
                 "col_end": char_info.get("col_end", 0),
                 "label": char_label.get("char"),
-                "labeled_at": char_label.get("labeled_at")
+                "labeled_at": char_label.get("labeled_at"),
+                "char_status": char_status,
+                "predicted_char": predicted_char,
+                "confidence": confidence,
+                "confidence_level": confidence_level
             })
 
         return {
@@ -240,6 +259,57 @@ def skip_cluster(round_num: int, cluster_id: str):
             return {"code": 0, "msg": "已跳过"}
         else:
             raise HTTPException(status_code=500, detail="操作失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/chars/{char_id}/skip")
+def skip_char(round_num: int, char_id: str):
+    """跳过单个字符"""
+    try:
+        manager = MultiClusteringManager()
+        success = manager.skip_char(char_id, round_num)
+
+        if success:
+            return {"code": 0, "msg": "已跳过"}
+        else:
+            raise HTTPException(status_code=500, detail="操作失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/chars/batch-skip")
+def batch_skip_chars(round_num: int, request: BatchSkipRequest):
+    """批量跳过字符"""
+    try:
+        manager = MultiClusteringManager()
+        result = manager.batch_skip_chars(request.char_ids, round_num)
+        return {"code": 0, "msg": f"已跳过 {result['skipped']} 个字符", "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/chars/{char_id}/unskip")
+def unskip_char(round_num: int, char_id: str):
+    """撤回跳过单个字符"""
+    try:
+        manager = MultiClusteringManager()
+        success = manager.unskip_char(char_id, round_num)
+        if success:
+            return {"code": 0, "msg": "已撤回跳过"}
+        else:
+            raise HTTPException(status_code=500, detail="操作失败")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rounds/{round_num}/chars/batch-unskip")
+def batch_unskip_chars(round_num: int, request: BatchSkipRequest):
+    """批量撤回跳过字符"""
+    try:
+        manager = MultiClusteringManager()
+        result = manager.batch_unskip_chars(request.char_ids, round_num)
+        return {"code": 0, "msg": f"已撤回跳过 {result['unskipped']} 个字符", "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
