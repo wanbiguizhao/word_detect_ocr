@@ -305,6 +305,38 @@ class CharPoolManager:
         
         return True
     
+    def batch_mark_as_skipped(self, char_ids: List[str], round_num: int):
+        """批量标记字符为跳过"""
+        if not char_ids:
+            return
+        
+        all_chars = self.load_all_chars()
+        char_id_set = set(char_ids)
+        now = datetime.datetime.now().isoformat()
+        
+        for char_id in char_ids:
+            if char_id in all_chars:
+                all_chars[char_id]["status"] = "skipped"
+                all_chars[char_id]["labeled_round"] = round_num
+                all_chars[char_id]["updated_at"] = now
+        
+        self._save_json(self.all_chars_path, {
+            "version": "1.0",
+            "total_count": len(all_chars),
+            "updated_at": now,
+            "chars": all_chars
+        })
+        
+        unlabeled_ids = self.get_unlabeled_char_ids()
+        new_unlabeled = [cid for cid in unlabeled_ids if cid not in char_id_set]
+        if len(new_unlabeled) != len(unlabeled_ids):
+            self._save_json(self.unlabeled_path, {
+                "version": "1.0",
+                "count": len(new_unlabeled),
+                "updated_at": now,
+                "char_ids": new_unlabeled
+            })
+    
     def get_stats(self) -> dict:
         """获取字符池统计信息"""
         all_chars = self.load_all_chars()

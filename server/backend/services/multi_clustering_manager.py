@@ -774,13 +774,197 @@ class MultiClusteringManager:
         
         self._save_json(labels_path, labels_data)
         
-        # 将该聚类的所有字符标记为跳过
+        # 收集该聚类的所有字符ID
+        cluster_char_ids = []
         clusters_data = self.get_round_clusters(round_num)
         if clusters_data:
             cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
             for char_info in cluster_chars:
                 char_id = char_info.get("char_id")
                 if char_id:
-                    self.char_pool.mark_as_skipped(char_id, round_num)
+                    cluster_char_ids.append(char_id)
+        
+        # 同步更新所有数据系统
+        self._sync_skip_to_all(cluster_char_ids, round_num)
         
         return True
+    
+    def _update_prelabels_status(self, char_ids: List[str], status: str):
+        """更新 pre_labels.json 中字符的状态
+        
+        Args:
+            char_ids: 字符ID列表
+            status: 新状态（"pending", "labeled", "skipped"）
+        """
+        prelabels_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / "pre_labels.json"
+        
+        if not prelabels_path.exists():
+            return
+        
+        with open(prelabels_path, 'r', encoding='utf-8') as f:
+            prelabels_data = json.load(f)
+        
+        prelabels = prelabels_data.get("prelabels", [])
+        char_id_set = set(char_ids)
+        
+        updated = False
+        for p in prelabels:
+            if p.get("char_id") in char_id_set:
+                p["status"] = status
+                updated = True
+        
+        if updated:
+            with open(prelabels_path, 'w', encoding='utf-8') as f:
+                json.dump(prelabels_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"[Manager] 已更新 pre_labels.json 中 {len(char_id_set)} 个字符的状态为 '{status}'")
+    
+    def skip_char(self, char_id: str, round_num: int) -> bool:
+        """跳过单个字符
+        
+        Args:
+            char_id: 字符ID
+            round_num: 轮次编号（用于记录跳过的轮次）
+        
+        Returns:
+            bool: 是否成功跳过
+        """
+        # 同步更新所有数据系统
+        self._sync_skip_to_all([char_id], round_num)
+        
+        print(f"[Manager] 已跳过字符: {char_id} (轮次: {round_num})")
+        return True
+    
+    def batch_skip_chars(self, char_ids: List[str], round_num: int) -> dict:
+        """批量跳过字符（单次文件IO，避免并发冲突）
+        
+        Args:
+            char_ids: 字符ID列表
+            round_num: 轮次编号
+        
+        Returns:
+            dict: {"skipped": 跳过数量, "total": 总数量}
+        """
+        if not char_ids:
+            return {"skipped": 0, "total": 0}
+        
+        valid_ids = [cid for cid in char_ids if cid]
+        if not valid_ids:
+            return {"skipped": 0, "total": len(char_ids)}
+        
+        self._sync_skip_to_all(valid_ids, round_num)
+        
+        print(f"[Manager] 批量跳过: {len(valid_ids)} 个字符 (轮次: {round_num})")
+        return {"skipped": len(valid_ids), "total": len(char_ids)}
+    
+    def _sync_skip_to_all(self, char_ids: List[str], round_num: int):
+        """跳过操作同步到所有数据系统（批量优化版）"""
+        if not char_ids:
+            return
+        
+        # 1. 聚类系统: 批量更新字符池
+        self.char_pool.batch_mark_as_skipped(char_ids, round_num)
+        
+        # 2. OCR系统: 批量更新 pre_labels.json
+        self._update_prelabels_status(char_ids, "skipped")
+        
+        # 3. OCR系统: 批量更新 prelabel_status.json
+        self.data_store.batch_skip_prelabels(char_ids)
+        
+        # 4. 统一标记: 批量更新 unified_labels.json
+        self._update_unified_labels_status(char_ids, "skipped")
+        
+        print(f"[Manager] 跳过同步完成: {len(char_ids)} 个字符已同步到所有数据系统")
+    
+    def unskip_char(self, char_id: str, round_num: int) -> bool:
+        """撤回跳过单个字符
+        
+        Args:
+            char_id: 字符ID
+            round_num: 轮次编号
+        
+        Returns:
+            bool: 是否成功撤回
+        """
+        self._sync_unskip_to_all([char_id], round_num)
+        print(f"[Manager] 已撤回跳过字符: {char_id}")
+        return True
+    
+    def batch_unskip_chars(self, char_ids: List[str], round_num: int) -> dict:
+        """批量撤回跳过字符
+        
+        Args:
+            char_ids: 字符ID列表
+            round_num: 轮次编号
+        
+        Returns:
+            dict: {"unskipped": 撤回数量, "total": 总数量}
+        """
+        if not char_ids:
+            return {"unskipped": 0, "total": 0}
+        
+        valid_ids = [cid for cid in char_ids if cid]
+        if not valid_ids:
+            return {"unskipped": 0, "total": len(char_ids)}
+        
+        self._sync_unskip_to_all(valid_ids, round_num)
+        print(f"[Manager] 批量撤回跳过: {len(valid_ids)} 个字符")
+        return {"unskipped": len(valid_ids), "total": len(char_ids)}
+    
+    def _sync_unskip_to_all(self, char_ids: List[str], round_num: int):
+        """撤回跳过操作同步到所有数据系统
+        
+        确保以下三个系统的一致性：
+        1. 聚类系统: char_pool (all_chars.json, labeled.json, unlabeled.json)
+        2. OCR系统: pre_labels.json + prelabel_status.json
+        3. 统一标记: unified_labels.json
+        
+        Args:
+            char_ids: 要撤回跳过的字符ID列表
+            round_num: 轮次编号
+        """
+        if not char_ids:
+            return
+        
+        # 1. 聚类系统: 更新字符池（重置为未标注状态）
+        for char_id in char_ids:
+            self.char_pool.reset_char(char_id)
+        
+        # 2. OCR系统: 更新 pre_labels.json
+        self._update_prelabels_status(char_ids, "pending")
+        
+        # 3. OCR系统: 更新 prelabel_status.json (DataStore 维护)
+        for char_id in char_ids:
+            self.data_store.reset_prelabel(char_id)
+        
+        # 4. 统一标记: 更新 unified_labels.json（重置为无状态或删除状态字段）
+        self._update_unified_labels_status(char_ids, "pending")
+        
+        print(f"[Manager] 撤回跳过同步完成: {len(char_ids)} 个字符已同步到所有数据系统")
+    
+    def _update_unified_labels_status(self, char_ids: List[str], status: str):
+        """更新 unified_labels.json 中字符的状态
+        
+        Args:
+            char_ids: 字符ID列表
+            status: 新状态（"labeled", "skipped"）
+        """
+        if not self.unified_labels_path.exists():
+            return
+        
+        unified_data = self._load_json(self.unified_labels_path)
+        if not unified_data or "annotations" not in unified_data:
+            return
+        
+        char_id_set = set(char_ids)
+        updated = False
+        
+        for ann in unified_data["annotations"]:
+            if ann.get("char_id") in char_id_set:
+                ann["status"] = status
+                ann["updated_at"] = datetime.datetime.now().isoformat()
+                updated = True
+        
+        if updated:
+            self._save_json(self.unified_labels_path, unified_data)
+            print(f"[Manager] 已更新 unified_labels.json 中 {len(char_id_set)} 个字符的状态为 '{status}'")
