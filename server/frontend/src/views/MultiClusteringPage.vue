@@ -18,31 +18,73 @@
     <div class="params-panel">
       <a-collapse :activeKey="['params']" :bordered="false">
       <a-collapse-panel key="params" header="聚类参数配置">
-        <a-form layout="inline">
-          <a-form-item label="聚类方法">
-            <a-select v-model:value="method" style="width: 120px;">
-              <a-select-option value="hdbscan">HDBSCAN</a-select-option>
-              <a-select-option value="kmeans">KMeans</a-select-option>
+        <!-- 数据源选择器 -->
+        <div class="data-source-section">
+          <a-form-item label="数据源" class="data-source-item">
+            <a-select v-model:value="data_source" style="width: 200px;">
+              <a-select-option value="unlabeled">未标注汉字</a-select-option>
+              <a-select-option value="low_confidence">低置信度预测</a-select-option>
+              <a-select-option value="outlier" disabled>已标注离群检测 (即将支持)</a-select-option>
             </a-select>
           </a-form-item>
-          
-          <a-form-item v-if="method === 'hdbscan'" label="最小聚类大小">
-            <input type="number" v-model.number="min_cluster_size" min="3" max="50" class="param-input" />
-          </a-form-item>
-          
-          <a-form-item v-if="method === 'hdbscan'" label="核心点样本数">
-            <input type="number" v-model.number="min_samples" min="1" max="20" class="param-input" />
-          </a-form-item>
-          
-          <a-form-item v-if="method === 'hdbscan'" label="最大聚类大小">
-            <input type="number" v-model.number="max_cluster_size" min="10" max="200" class="param-input" />
-          </a-form-item>
-          
-          <a-form-item v-if="method === 'kmeans'" label="目标聚类数">
-            <input type="number" v-model.number="n_clusters" min="2" max="100" class="param-input" />
-          </a-form-item>
-        </a-form>
-        <a-button @click="showParams" style="margin-top: 12px;">显示当前参数</a-button>
+          <div class="data-source-hint">
+            <span v-if="data_source === 'unlabeled'">对尚未标注的汉字图片进行聚类，发现新的汉字类别</span>
+            <span v-else-if="data_source === 'low_confidence'">对OCR预测置信度较低的图片进行聚类审查</span>
+            <span v-else-if="data_source === 'outlier'">检测已标注数据中可能的标注错误</span>
+          </div>
+        </div>
+
+        <a-divider style="margin: 12px 0;" />
+
+        <!-- 未标注汉字 / 低置信度 共享的聚类参数 -->
+        <template v-if="data_source === 'unlabeled' || data_source === 'low_confidence'">
+          <!-- 低置信度特有参数 -->
+          <div v-if="data_source === 'low_confidence'" class="param-group">
+            <a-form-item label="置信度阈值">
+              <a-slider
+                v-model:value="confidence_threshold"
+                :min="0.1"
+                :max="0.95"
+                :step="0.05"
+                :marks="{ 0.1: '0.1', 0.5: '0.5', 0.7: '0.7', 0.95: '0.95' }"
+                style="width: 300px;"
+              />
+              <span class="param-hint">只聚类置信度低于此值的图片</span>
+            </a-form-item>
+          </div>
+
+          <a-form layout="inline">
+            <a-form-item label="聚类方法">
+              <a-select v-model:value="method" style="width: 120px;">
+                <a-select-option value="hdbscan">HDBSCAN</a-select-option>
+                <a-select-option value="kmeans">KMeans</a-select-option>
+              </a-select>
+            </a-form-item>
+            
+            <a-form-item v-if="method === 'hdbscan'" label="最小聚类大小">
+              <input type="number" v-model.number="min_cluster_size" min="3" max="50" class="param-input" />
+            </a-form-item>
+            
+            <a-form-item v-if="method === 'hdbscan'" label="核心点样本数">
+              <input type="number" v-model.number="min_samples" min="1" max="20" class="param-input" />
+            </a-form-item>
+            
+            <a-form-item v-if="method === 'hdbscan'" label="最大聚类大小">
+              <input type="number" v-model.number="max_cluster_size" min="10" max="200" class="param-input" />
+            </a-form-item>
+            
+            <a-form-item v-if="method === 'kmeans'" label="目标聚类数">
+              <input type="number" v-model.number="n_clusters" min="2" max="100" class="param-input" />
+            </a-form-item>
+          </a-form>
+        </template>
+
+        <!-- 离群检测参数 (Phase 3 预留) -->
+        <template v-if="data_source === 'outlier'">
+          <div class="param-group">
+            <p class="param-placeholder">离群检测参数将在后续版本中开放</p>
+          </div>
+        </template>
       </a-collapse-panel>
     </a-collapse>
     </div>
@@ -50,7 +92,6 @@
     <!-- 操作区域 -->
     <div class="toolbar">
       <div class="new-round-form">
-        <a-input-number v-model:value="newRoundClusters" :min="1" :max="1000" style="width: 120px;" />
         <a-input v-model:value="newRoundDesc" placeholder="轮次描述" style="width: 200px;" />
         <a-button type="primary" @click="startNewRound" :loading="isStarting">
           启动新轮聚类
@@ -64,6 +105,11 @@
       <a-radio-group v-model:value="activeRound" @change="handleRoundChange">
         <a-radio-button v-for="round in rounds" :key="round.round" :value="round.round">
           第{{ round.round }}轮
+          <a-tag v-if="round.data_source && round.data_source !== 'unlabeled'" 
+                 :color="getDataSourceColor(round.data_source)" 
+                 class="round-type-tag">
+            {{ getDataSourceLabel(round.data_source) }}
+          </a-tag>
         </a-radio-button>
       </a-radio-group>
     </div>
@@ -72,12 +118,16 @@
     <div v-if="currentRound" class="round-info-card">
       <div class="round-info-header">
         <span class="round-title">第 {{ currentRound.round }} 轮聚类</span>
+        <a-tag v-if="currentRound.data_source" :color="getDataSourceColor(currentRound.data_source)">
+          {{ getDataSourceLabel(currentRound.data_source) }}
+        </a-tag>
         <span class="round-date">{{ formatDate(currentRound.date) }}</span>
       </div>
       <div class="round-info-body">
         <span>描述: {{ currentRound.description }}</span>
         <span>聚类数: {{ currentRound.n_clusters }}</span>
         <span>字符数: {{ currentRound.total_chars }}</span>
+        <span v-if="currentRound.confidence_threshold != null">置信度阈值: {{ currentRound.confidence_threshold }}</span>
       </div>
     </div>
 
@@ -163,12 +213,13 @@ const activeRound = ref(null)
 const clusters = ref([])
 const currentRound = ref(null)
 
-const newRoundClusters = ref(100)
 const newRoundDesc = ref('')
 const isStarting = ref(false)
 const activeClusterId = ref(null)
 
-// 聚类参数配置 - 使用单独的 ref
+const data_source = ref('unlabeled')
+const confidence_threshold = ref(0.7)
+
 const method = ref('hdbscan')
 const min_cluster_size = ref(5)
 const min_samples = ref(2)
@@ -193,6 +244,24 @@ const getStatusText = (status) => {
     case 'labeled': return '已标注'
     case 'skipped': return '已跳过'
     default: return '未标注'
+  }
+}
+
+const getDataSourceColor = (ds) => {
+  switch (ds) {
+    case 'unlabeled': return 'blue'
+    case 'low_confidence': return 'orange'
+    case 'outlier': return 'red'
+    default: return 'default'
+  }
+}
+
+const getDataSourceLabel = (ds) => {
+  switch (ds) {
+    case 'unlabeled': return '未标注'
+    case 'low_confidence': return '低置信度'
+    case 'outlier': return '离群检测'
+    default: return ds || '未标注'
   }
 }
 
@@ -251,28 +320,19 @@ const fetchRoundDetail = async (roundNum) => {
   }
 }
 
-const showParams = () => {
-  console.log('[DEBUG] method:', method.value)
-  console.log('[DEBUG] min_cluster_size:', min_cluster_size.value)
-  console.log('[DEBUG] min_samples:', min_samples.value)
-  console.log('[DEBUG] max_cluster_size:', max_cluster_size.value)
-  console.log('[DEBUG] n_clusters:', n_clusters.value)
-  
-  alert(`当前参数:\n\nmethod: ${method.value}\nmin_cluster_size: ${min_cluster_size.value}\nmin_samples: ${min_samples.value}\nmax_cluster_size: ${max_cluster_size.value}\nn_clusters: ${n_clusters.value}`)
-}
-
 const startNewRound = async () => {
   if (isStarting.value) return
   
   isStarting.value = true
   try {
-    console.log('[Frontend] 准备发送的参数:')
-    console.log('  method:', method.value)
-    console.log('  max_cluster_size:', max_cluster_size.value)
-    
     const params = {
       description: newRoundDesc.value || `第${rounds.value.length + 1}轮聚类`,
+      data_source: data_source.value,
       method: method.value
+    }
+    
+    if (data_source.value === 'low_confidence') {
+      params.confidence_threshold = confidence_threshold.value
     }
     
     if (method.value === 'hdbscan') {
@@ -287,8 +347,7 @@ const startNewRound = async () => {
     
     const res = await axios.post(`${API_BASE}/rounds`, params)
     if (res.data.code === 0) {
-      alert(`第${res.data.round}轮聚类已启动！`)
-      newRoundClusters.value = 100
+      alert(`第${res.data.round}轮聚类已启动！（数据源: ${getDataSourceLabel(data_source.value)}）`)
       newRoundDesc.value = ''
       await refreshData()
     } else {
@@ -296,7 +355,8 @@ const startNewRound = async () => {
     }
   } catch (e) {
     console.error('启动聚类失败:', e)
-    alert('启动聚类失败')
+    const msg = e.response?.data?.detail || '启动聚类失败'
+    alert(msg)
   } finally {
     isStarting.value = false
   }
@@ -406,6 +466,35 @@ onMounted(() => {
   padding: 16px;
 }
 
+.data-source-section {
+  margin-bottom: 8px;
+}
+
+.data-source-item {
+  margin-bottom: 4px;
+}
+
+.data-source-hint {
+  color: #8c8c8c;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.param-group {
+  margin-bottom: 16px;
+}
+
+.param-hint {
+  color: #8c8c8c;
+  font-size: 13px;
+  margin-left: 12px;
+}
+
+.param-placeholder {
+  color: #8c8c8c;
+  font-style: italic;
+}
+
 .param-input {
   width: 100px;
   padding: 4px 11px;
@@ -436,6 +525,13 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.round-type-tag {
+  margin-left: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+
 .round-info-card {
   background: #fff;
   border: 1px solid #e8e8e8;
@@ -446,7 +542,8 @@ onMounted(() => {
 
 .round-info-header {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -457,6 +554,7 @@ onMounted(() => {
 .round-date {
   color: #999;
   font-size: 14px;
+  margin-left: auto;
 }
 
 .round-info-body {
