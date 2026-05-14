@@ -30,8 +30,10 @@ class StatsManager:
             {
                 "char": char,
                 "total": info["total"],
-                "confirmed": info["confirmed"],
-                "pending": info["pending"]
+                "labeled": info["labeled"],
+                "pending": info["pending"],
+                "skipped": info["skipped"],
+                "unlabeled": info["unlabeled"]
             }
             for char, info in char_stats.items()
         ]
@@ -39,7 +41,7 @@ class StatsManager:
         if search:
             char_list = [c for c in char_list if search in c["char"]]
         
-        if sort_by and sort_by in ["total", "confirmed", "pending"]:
+        if sort_by and sort_by in ["total", "labeled", "pending", "skipped", "unlabeled"]:
             reverse = sort_order == "desc"
             char_list.sort(key=lambda x: x[sort_by], reverse=reverse)
         else:

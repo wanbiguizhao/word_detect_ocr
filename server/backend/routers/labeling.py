@@ -22,14 +22,17 @@ class CharStats(BaseModel):
     char: str
     total: int
     labeled: int
-    prelabeled: int
+    pending: int
+    skipped: int = 0
+    unlabeled: int = 0
 
 
 class DatasetStats(BaseModel):
     dataset: str
     total_images: int
     labeled_count: int
-    prelabeled_count: int
+    pending_count: int
+    skipped_count: int = 0
     unlabeled_count: int
     char_stats: List[CharStats]
 
@@ -94,9 +97,13 @@ class BatchModifyRequest(BaseModel):
 
 
 @router.get("/api/labeling/stats", response_model=DatasetStats)
-def get_labeling_stats():
+def get_labeling_stats(refresh: bool = False):
     dataset = config.get("dataset.current", "pdf5826")
     stats_manager = StatsManager(dataset)
+    
+    if refresh:
+        stats_manager.refresh_cache()
+    
     stats = stats_manager.get_stats()
     
     char_stats = []
@@ -107,10 +114,10 @@ def get_labeling_stats():
             char_stats.append({
                 "char": char,
                 "total": info.get("total", 0),
-                "labeled": info.get("confirmed", 0),
-                "prelabeled": info.get("pending", 0),
-                "confirmed": info.get("confirmed", 0),
-                "pending": info.get("pending", 0)
+                "labeled": info.get("labeled", 0),
+                "pending": info.get("pending", 0),
+                "skipped": info.get("skipped", 0),
+                "unlabeled": info.get("unlabeled", 0)
             })
     elif isinstance(char_stats_dict, list):
         char_stats = char_stats_dict
@@ -121,7 +128,8 @@ def get_labeling_stats():
         "dataset": stats.get("dataset", dataset),
         "total_images": stats.get("total_images", 0),
         "labeled_count": stats.get("labeled_count", 0),
-        "prelabeled_count": stats.get("total_images", 0) - stats.get("unlabeled_count", 0),
+        "pending_count": stats.get("pending_count", 0),
+        "skipped_count": stats.get("skipped_count", 0),
         "unlabeled_count": stats.get("unlabeled_count", 0),
         "char_stats": char_stats
     }
