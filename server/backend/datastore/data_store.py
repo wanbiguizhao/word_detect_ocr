@@ -910,3 +910,306 @@ class DataStore:
     def get_sync_statistics(self) -> dict:
         """获取同步日志统计"""
         return self._logger.get_statistics()
+    
+    # ==================== 修改/撤回/跳过操作 ====================
+    
+    def modify_annotation(self, char_id: str, old_char: Optional[str], new_char: str, 
+                         source: str = "manual", changed_by: str = "user", comment: str = "修改标注"):
+        """修改已有的标注（替换字符）"""
+        try:
+            # 1. 写入WAL日志
+            self._write_wal("modify", {
+                "char_id": char_id,
+                "old_char": old_char,
+                "new_char": new_char,
+                "source": source
+            })
+            
+            # 2. 更新统一标注
+            updated_old_char = self.update_unified_label(char_id, {
+                "char": new_char,
+                "status": "labeled",
+                "source": source,
+                "updated_at": datetime.datetime.now().isoformat()
+            })
+            
+            # 3. 添加历史记录
+            self._add_history_record(char_id, updated_old_char, new_char, changed_by, source, comment)
+            
+            # 4. 更新索引
+            self._update_indexes(char_id, updated_old_char, new_char)
+            
+            # 5. 更新 prelabel_status 中的修正字符
+            self._update_prelabel_corrected(char_id, new_char)
+            
+            # 6. 同步到其他数据源
+            self._sync_to_cluster_labels(char_id, new_char)
+            self._sync_to_multi_clustering(char_id, new_char)
+            
+            # 7. 原子提交（清理WAL）
+            self._cleanup_wal()
+            
+            # 8. 清除缓存
+            self._invalidate_dataset_cache()
+            
+            self._logger.log_write_annotation(char_id, new_char, success=True)
+            
+        except Exception as e:
+            self._logger.log_write_annotation(char_id, new_char, success=False, message=str(e))
+            raise
+    
+    def revoke_annotation(self, char_id: str, changed_by: str = "user", comment: str = "撤回确认"):
+        """撤回已确认的标注（恢复为待确认状态）"""
+        try:
+            # 1. 获取旧字符
+            confirmed_anns = self.get_confirmed_annotations()
+            old_char = confirmed_anns.get(char_id)
+            
+            if old_char is None:
+                logger.warning(f"尝试撤回未确认的标注: {char_id}")
+                return
+            
+            # 2. 写入WAL日志
+            self._write_wal("revoke", {
+                "char_id": char_id,
+                "old_char": old_char,
+                "source": "revoke"
+            })
+            
+            # 3. 从统一标注中删除
+            self._remove_unified_label(char_id)
+            
+            # 4. 添加历史记录
+            self._add_history_record(char_id, old_char, None, changed_by, "revoke", comment)
+            
+            # 5. 从索引中移除
+            self._update_indexes(char_id, old_char, None)
+            
+            # 6. 更新 prelabel_status 为 pending
+            self._update_prelabel_status(char_id, "pending")
+            
+            # 7. 从其他数据源移除
+            self._remove_from_cluster_labels(char_id)
+            self._remove_from_multi_clustering(char_id)
+            
+            # 8. 原子提交（清理WAL）
+            self._cleanup_wal()
+            
+            # 9. 清除缓存
+            self._invalidate_dataset_cache()
+            
+            logger.info(f"撤回确认: {char_id} - {old_char}")
+            
+        except Exception as e:
+            logger.error(f"撤回确认失败: {char_id}, 错误: {e}")
+            raise
+    
+    def skip_prelabel(self, char_id: str, changed_by: str = "user"):
+        """跳过单个预标注"""
+        try:
+            # 更新 prelabel_status 为 skipped
+            self._update_prelabel_status(char_id, "skipped")
+            
+            # 添加历史记录
+            self._add_history_record(
+                char_id, None, None, changed_by, "skip", "跳过该预标注"
+            )
+            
+            logger.info(f"跳过预标注: {char_id}")
+            
+        except Exception as e:
+            logger.error(f"跳过预标注失败: {char_id}, 错误: {e}")
+            raise
+    
+    def batch_skip_prelabels(self, char_ids: List[str], changed_by: str = "user"):
+        """批量跳过预标注"""
+        if not char_ids:
+            return
+        
+        try:
+            # 批量更新 prelabel_status
+            status_data = self._load_file(self.prelabel_status_path, default={
+                "status": {}, "corrected_chars": {}
+            })
+            
+            for char_id in char_ids:
+                status_data["status"][char_id] = "skipped"
+                
+                # 添加历史记录
+                self._add_history_record(
+                    char_id, None, None, changed_by, "skip", "批量跳过"
+                )
+            
+            self._save_file(self.prelabel_status_path, status_data)
+            
+            logger.info(f"批量跳过预标注: {len(char_ids)} 条")
+            
+        except Exception as e:
+            logger.error(f"批量跳过预标注失败, 错误: {e}")
+            raise
+    
+    def batch_modify_prelabels(self, char_updates: dict, changed_by: str = "user"):
+        """批量修改预标注（优化版，减少文件IO次数）
+        
+        Args:
+            char_updates: {char_id: new_char} 的字典
+            changed_by: 修改者
+            
+        Returns:
+            成功修改的数量
+        """
+        if not char_updates:
+            return 0
+            
+        try:
+            # 确保缓存已加载
+            if not self._prelabel_status:
+                self._prelabel_status = self._load_file(self.prelabel_status_path, default={
+                    "status": {}, "corrected_chars": {}
+                })
+            
+            # 确保键存在
+            if "status" not in self._prelabel_status:
+                self._prelabel_status["status"] = {}
+            if "corrected_chars" not in self._prelabel_status:
+                self._prelabel_status["corrected_chars"] = {}
+            
+            # 批量更新缓存
+            success_count = 0
+            for char_id, new_char in char_updates.items():
+                self._prelabel_status["corrected_chars"][char_id] = new_char
+                self._prelabel_status["status"][char_id] = "confirmed"
+                
+                # 添加历史记录
+                self._add_history_record(
+                    char_id, None, new_char, changed_by, "modify", "批量修改"
+                )
+                success_count += 1
+            
+            self._prelabel_status["updated_at"] = datetime.datetime.now().isoformat()
+            
+            # 保存到文件（同时也更新缓存）
+            self._flush_prelabel_status()
+            
+            logger.info(f"批量修改预标注: {success_count}/{len(char_updates)} 条成功")
+            return success_count
+            
+        except Exception as e:
+            logger.error(f"批量修改预标注失败, 错误: {e}")
+            raise
+    
+    def unskip_prelabel(self, char_id: str, changed_by: str = "user"):
+        """取消跳过预标注（恢复为待确认状态）"""
+        try:
+            self._update_prelabel_status(char_id, "pending")
+            
+            # 添加历史记录
+            self._add_history_record(
+                char_id, None, None, changed_by, "unskip", "取消跳过"
+            )
+            
+            logger.info(f"取消跳过预标注: {char_id}")
+            
+        except Exception as e:
+            logger.error(f"取消跳过预标注失败: {char_id}, 错误: {e}")
+            raise
+    
+    def modify_prelabel(self, char_id: str, new_char: str, changed_by: str = "user"):
+        """单独修改预标注（直接修改prelabel_status）
+        
+        Args:
+            char_id: 字符ID
+            new_char: 新的字符
+            changed_by: 修改者
+            
+        Returns:
+            是否成功
+        """
+        try:
+            # 确保缓存已加载
+            if not self._prelabel_status:
+                self._prelabel_status = self._load_file(self.prelabel_status_path, default={
+                    "status": {}, "corrected_chars": {}
+                })
+            
+            # 确保键存在
+            if "status" not in self._prelabel_status:
+                self._prelabel_status["status"] = {}
+            if "corrected_chars" not in self._prelabel_status:
+                self._prelabel_status["corrected_chars"] = {}
+            
+            # 更新缓存
+            self._prelabel_status["corrected_chars"][char_id] = new_char
+            self._prelabel_status["status"][char_id] = "confirmed"
+            self._prelabel_status["updated_at"] = datetime.datetime.now().isoformat()
+            
+            # 添加历史记录
+            self._add_history_record(
+                char_id, None, new_char, changed_by, "modify", "单独修改"
+            )
+            
+            # 保存到文件（同时也更新缓存）
+            self._flush_prelabel_status()
+            
+            logger.info(f"单独修改预标注: {char_id} -> {new_char} 成功")
+            return True
+            
+        except Exception as e:
+            logger.error(f"单独修改预标注失败: {char_id}, 错误: {e}")
+            raise
+    
+    # ==================== 内部辅助方法 ====================
+    
+    def _remove_unified_label(self, char_id: str):
+        """从统一标注中删除一个标注"""
+        data = self._load_file(self.unified_labels_path)
+        annotations = data.get("annotations", [])
+        
+        # 查找并删除
+        new_annotations = []
+        for ann in annotations:
+            if ann.get("char_id") != char_id:
+                new_annotations.append(ann)
+        
+        data["annotations"] = new_annotations
+        
+        # 更新统计
+        data["total_labeled"] = len([a for a in new_annotations if a.get("status") == "labeled"])
+        
+        # 更新字符分布
+        char_dist = {}
+        for ann in new_annotations:
+            char = ann.get("char")
+            if char:
+                char_dist[char] = char_dist.get(char, 0) + 1
+        data["char_distribution"] = char_dist
+        
+        self._save_file(self.unified_labels_path, data)
+    
+    def _update_prelabel_status(self, char_id: str, status: str):
+        """更新预标注状态"""
+        status_data = self._load_file(self.prelabel_status_path, default={
+            "status": {}, "corrected_chars": {}
+        })
+        status_data["status"][char_id] = status
+        self._save_file(self.prelabel_status_path, status_data)
+    
+    def _update_prelabel_corrected(self, char_id: str, corrected_char: str):
+        """更新预标注的修正字符，并同时设置状态为confirmed"""
+        status_data = self._load_file(self.prelabel_status_path, default={
+            "status": {}, "corrected_chars": {}
+        })
+        status_data["corrected_chars"][char_id] = corrected_char
+        # 同时设置状态为confirmed，这样刷新页面后状态也正确
+        status_data["status"][char_id] = "confirmed"
+        self._save_file(self.prelabel_status_path, status_data)
+    
+    def _remove_from_cluster_labels(self, char_id: str):
+        """从聚类标注中移除（如果有）"""
+        # 这里可以实现删除聚类标注的逻辑
+        pass
+    
+    def _remove_from_multi_clustering(self, char_id: str):
+        """从多轮聚类标注中移除（如果有）"""
+        # 这里可以实现删除多轮聚类标注的逻辑
+        pass

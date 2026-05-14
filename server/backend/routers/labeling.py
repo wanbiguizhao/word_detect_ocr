@@ -58,6 +58,41 @@ class BatchConfirmRequest(BaseModel):
     items: List[SimpleConfirmRequest]
 
 
+class SimpleRevokeRequest(BaseModel):
+    char_id: str
+
+
+class BatchRevokeRequest(BaseModel):
+    char_ids: List[str]
+
+
+class SimpleSkipRequest(BaseModel):
+    char_id: str
+
+
+class BatchSkipRequest(BaseModel):
+    char_ids: List[str]
+
+
+class SimpleUnskipRequest(BaseModel):
+    char_id: str
+
+
+class BatchUnskipRequest(BaseModel):
+    char_ids: List[str]
+
+
+class ModifyAnnotationRequest(BaseModel):
+    char_id: str
+    old_char: Optional[str]
+    new_char: str
+
+
+class BatchModifyRequest(BaseModel):
+    char_ids: List[str]
+    new_char: str
+
+
 @router.get("/api/labeling/stats", response_model=DatasetStats)
 def get_labeling_stats():
     dataset = config.get("dataset.current", "pdf5826")
@@ -143,16 +178,7 @@ def simple_confirm(request: SimpleConfirmRequest):
     }
 
 
-@router.post("/api/labeling/modify")
-def simple_modify(request: SimpleModifyRequest):
-    dataset = config.get("dataset.current", "pdf5826")
-    stats_manager = StatsManager(dataset)
-    stats_manager.confirm_annotation(request.char_id, request.char)
 
-    return {
-        "code": 0,
-        "msg": f"已将图片 {request.char_id} 修改为: {request.char}"
-    }
 
 
 @router.post("/api/labeling/confirm/batch")
@@ -401,3 +427,169 @@ def get_sync_statistics():
         "msg": "success",
         "data": stats
     }
+
+
+# ==================== 修改/撤回/跳过操作接口 ====================
+
+@router.post("/api/labeling/modify")
+def modify_annotation(request: ModifyAnnotationRequest):
+    """修改预标注（直接修改prelabel_status）"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        # 对于预标注页面的修改，直接修改prelabel_status
+        store.modify_prelabel(
+            char_id=request.char_id,
+            new_char=request.new_char,
+            changed_by="user"
+        )
+        
+        logger.info(f"修改预标注: {request.char_id} - {request.old_char} -> {request.new_char}")
+        
+        return {
+            "code": 0,
+            "msg": f"成功修改预标注: {request.char_id} - {request.new_char}"
+        }
+    except Exception as e:
+        logger.error(f"修改预标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"修改预标注失败: {str(e)}")
+
+
+@router.post("/api/labeling/revoke")
+def revoke_annotation(request: SimpleRevokeRequest):
+    """撤回已确认的标注"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        store.revoke_annotation(
+            char_id=request.char_id,
+            changed_by="user",
+            comment="API撤回确认"
+        )
+        
+        logger.info(f"撤回确认: {request.char_id}")
+        
+        return {
+            "code": 0,
+            "msg": f"成功撤回确认: {request.char_id}"
+        }
+    except Exception as e:
+        logger.error(f"撤回确认失败: {e}")
+        raise HTTPException(status_code=500, detail=f"撤回确认失败: {str(e)}")
+
+
+@router.post("/api/labeling/skip")
+def skip_prelabel(request: SimpleSkipRequest):
+    """跳过单个预标注"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        store.skip_prelabel(
+            char_id=request.char_id,
+            changed_by="user"
+        )
+        
+        logger.info(f"跳过预标注: {request.char_id}")
+        
+        return {
+            "code": 0,
+            "msg": f"成功跳过预标注: {request.char_id}"
+        }
+    except Exception as e:
+        logger.error(f"跳过预标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"跳过预标注失败: {str(e)}")
+
+
+@router.post("/api/labeling/skip/batch")
+def batch_skip_prelabels(request: BatchSkipRequest):
+    """批量跳过预标注"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        store.batch_skip_prelabels(
+            char_ids=request.char_ids,
+            changed_by="user"
+        )
+        
+        logger.info(f"批量跳过预标注: {len(request.char_ids)} 条")
+        
+        return {
+            "code": 0,
+            "msg": f"成功批量跳过 {len(request.char_ids)} 条预标注"
+        }
+    except Exception as e:
+        logger.error(f"批量跳过预标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"批量跳过预标注失败: {str(e)}")
+
+
+@router.post("/api/labeling/unskip")
+def unskip_prelabel(request: SimpleUnskipRequest):
+    """取消跳过预标注"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        store.unskip_prelabel(
+            char_id=request.char_id,
+            changed_by="user"
+        )
+        
+        logger.info(f"取消跳过预标注: {request.char_id}")
+        
+        return {
+            "code": 0,
+            "msg": f"成功取消跳过预标注: {request.char_id}"
+        }
+    except Exception as e:
+        logger.error(f"取消跳过预标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"取消跳过预标注失败: {str(e)}")
+
+
+@router.post("/api/labeling/unskip/batch")
+def batch_unskip_prelabels(request: BatchUnskipRequest):
+    """批量取消跳过预标注"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        # 单独处理，因为没有 batch_unskip 方法，所以逐个处理
+        for char_id in request.char_ids:
+            store.unskip_prelabel(char_id, changed_by="user")
+        
+        logger.info(f"批量取消跳过预标注: {len(request.char_ids)} 条")
+        
+        return {
+            "code": 0,
+            "msg": f"成功批量取消跳过 {len(request.char_ids)} 条预标注"
+        }
+    except Exception as e:
+        logger.error(f"批量取消跳过预标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"批量取消跳过预标注失败: {str(e)}")
+
+
+@router.post("/api/labeling/modify/batch")
+def batch_modify_annotations(request: BatchModifyRequest):
+    """批量修改标注（优化版，减少文件IO次数）"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    
+    try:
+        # 构造 {char_id: new_char} 的字典
+        char_updates = {char_id: request.new_char for char_id in request.char_ids}
+        
+        # 使用批量方法，一次性完成
+        success_count = store.batch_modify_prelabels(char_updates, changed_by="user")
+        
+        return {
+            "code": 0,
+            "msg": f"成功批量修改 {success_count}/{len(request.char_ids)} 个标注",
+            "success_count": success_count,
+            "total_count": len(request.char_ids)
+        }
+    except Exception as e:
+        logger.error(f"批量修改标注失败: {e}")
+        raise HTTPException(status_code=500, detail=f"批量修改标注失败: {str(e)}")
