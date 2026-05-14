@@ -15,12 +15,14 @@ class BatchLabelSave(BaseModel):
     labels: List[LabelItem]
 
 class NewRoundRequest(BaseModel):
+    data_source: Optional[str] = "unlabeled"
     method: Optional[str] = "hdbscan"
     n_clusters: Optional[int] = None
     description: Optional[str] = ""
     min_cluster_size: Optional[int] = 5
     min_samples: Optional[int] = 2
     max_cluster_size: Optional[int] = 100
+    confidence_threshold: Optional[float] = 0.7
 
 
 @router.get("/rounds")
@@ -38,23 +40,26 @@ def get_rounds():
 def start_new_round(request: NewRoundRequest):
     """启动新一轮聚类"""
     try:
-        # 调试日志：打印接收到的参数
         print(f"[DEBUG] 接收到的聚类参数:")
+        print(f"  data_source: {request.data_source}")
         print(f"  method: {request.method}")
         print(f"  n_clusters: {request.n_clusters}")
         print(f"  description: {request.description}")
         print(f"  min_cluster_size: {request.min_cluster_size}")
         print(f"  min_samples: {request.min_samples}")
         print(f"  max_cluster_size: {request.max_cluster_size}")
+        print(f"  confidence_threshold: {request.confidence_threshold}")
 
         manager = MultiClusteringManager()
         round_num = manager.start_new_round(
+            data_source=request.data_source,
             n_clusters=request.n_clusters,
             description=request.description,
             method=request.method,
             min_cluster_size=request.min_cluster_size,
             min_samples=request.min_samples,
-            max_cluster_size=request.max_cluster_size
+            max_cluster_size=request.max_cluster_size,
+            confidence_threshold=request.confidence_threshold
         )
         return {
             "code": 0,

@@ -265,26 +265,10 @@ class MultiClusteringManager:
             return max(r["round"] for r in history["rounds"])
         return 0
     
-    def start_new_round(self, n_clusters: Optional[int] = None, 
-                        description: str = "",
-                        method: str = "hdbscan",
-                        min_cluster_size: int = 5,
-                        min_samples: int = 2,
-                        max_cluster_size: int = 100) -> int:
-        """启动新一轮聚类"""
-        # 调试日志：打印接收到的参数
-        print(f"[Manager] start_new_round 接收到的参数:")
-        print(f"  method: {method}")
-        print(f"  n_clusters: {n_clusters}")
-        print(f"  description: {description}")
-        print(f"  min_cluster_size: {min_cluster_size}")
-        print(f"  min_samples: {min_samples}")
-        print(f"  max_cluster_size: {max_cluster_size}")
-        
-        # 获取未标注字符
+    def _get_unlabeled_char_ids(self) -> List[str]:
+        """获取未标注字符ID列表（含自动初始化）"""
         unlabeled_ids = self.char_pool.get_unlabeled_char_ids()
         
-        # 如果字符池为空，尝试自动初始化
         if not unlabeled_ids:
             try:
                 self.char_pool.init_from_lineage()
@@ -292,14 +276,101 @@ class MultiClusteringManager:
             except Exception as e:
                 raise ValueError(f"字符池为空且初始化失败: {str(e)}")
         
-        if not unlabeled_ids:
-            raise ValueError("没有未标注字符，无法启动新轮聚类")
+        return unlabeled_ids
+
+    def _get_low_confidence_char_ids(self, confidence_threshold: float = 0.7) -> List[str]:
+        """获取低置信度预测的字符ID列表
         
-        # 获取字符特征
+        从 pre_labels.json 中筛选 confidence < threshold 的字符，
+        排除已标注和已跳过的字符，确保数据一致性。
+        
+        Args:
+            confidence_threshold: 置信度阈值，低于此值的字符被选中
+        """
+        prelabels_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / "pre_labels.json"
+        
+        if not prelabels_path.exists():
+            raise ValueError(f"预标注文件不存在: {prelabels_path}")
+        
+        with open(prelabels_path, 'r', encoding='utf-8') as f:
+            prelabels_data = json.load(f)
+        
+        prelabels = prelabels_data.get("prelabels", [])
+        if not prelabels:
+            raise ValueError("预标注数据为空，无法筛选低置信度字符")
+        
+        labeled_ids = self.char_pool.get_labeled_char_ids()
+        
+        all_chars = self.char_pool.load_all_chars()
+        skipped_ids = {char_id for char_id, info in all_chars.items() if info.get("status") == "skipped"}
+        
+        low_conf_ids = []
+        for p in prelabels:
+            char_id = p.get("char_id", "")
+            confidence = p.get("confidence", 1.0)
+            
+            if not char_id:
+                continue
+            if char_id in labeled_ids:
+                continue
+            if char_id in skipped_ids:
+                continue
+            if confidence < confidence_threshold:
+                low_conf_ids.append(char_id)
+        
+        if not low_conf_ids:
+            raise ValueError(
+                f"没有置信度低于 {confidence_threshold} 的未处理字符 "
+                f"(预标注总数: {len(prelabels)}, 已标注: {len(labeled_ids)}, 已跳过: {len(skipped_ids)})"
+            )
+        
+        print(f"[Manager] 低置信度筛选: 阈值={confidence_threshold}, "
+              f"预标注总数={len(prelabels)}, 已标注={len(labeled_ids)}, "
+              f"已跳过={len(skipped_ids)}, 低置信度未处理={len(low_conf_ids)}")
+        
+        return low_conf_ids
+
+    def start_new_round(self, n_clusters: Optional[int] = None, 
+                        description: str = "",
+                        method: str = "hdbscan",
+                        min_cluster_size: int = 5,
+                        min_samples: int = 2,
+                        max_cluster_size: int = 100,
+                        data_source: str = "unlabeled",
+                        confidence_threshold: float = 0.7) -> int:
+        """启动新一轮聚类
+        
+        Args:
+            data_source: 数据源类型
+                - "unlabeled": 未标注汉字（默认，现有行为）
+                - "low_confidence": 低置信度预测
+                - "outlier": 已标注离群检测（Phase 3）
+            confidence_threshold: 低置信度阈值，仅 data_source="low_confidence" 时生效
+        """
+        print(f"[Manager] start_new_round 接收到的参数:")
+        print(f"  data_source: {data_source}")
+        print(f"  method: {method}")
+        print(f"  n_clusters: {n_clusters}")
+        print(f"  description: {description}")
+        print(f"  min_cluster_size: {min_cluster_size}")
+        print(f"  min_samples: {min_samples}")
+        print(f"  max_cluster_size: {max_cluster_size}")
+        print(f"  confidence_threshold: {confidence_threshold}")
+        
+        if data_source == "unlabeled":
+            char_ids = self._get_unlabeled_char_ids()
+        elif data_source == "low_confidence":
+            char_ids = self._get_low_confidence_char_ids(confidence_threshold)
+        else:
+            raise ValueError(f"暂不支持的数据源类型: {data_source}")
+        
+        if not char_ids:
+            raise ValueError("没有可用的字符，无法启动新轮聚类")
+        
         features_dict = {}
         valid_char_ids = []
         
-        for char_id in unlabeled_ids:
+        for char_id in char_ids:
             img_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / "pdf_chars" / f"{char_id}.png"
             if img_path.exists():
                 feat = self._extract_hog_features(str(img_path))
@@ -382,6 +453,8 @@ class MultiClusteringManager:
         clusters_data = {
             "version": "1.0",
             "round": new_round,
+            "type": "clustering",
+            "data_source": data_source,
             "algorithm": method,
             "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
@@ -393,7 +466,10 @@ class MultiClusteringManager:
                 "max_cluster_size": max_cluster_size
             } if method == "hdbscan" else {
                 "n_clusters": n_clusters
-            }
+            },
+            "data_source_params": {
+                "confidence_threshold": confidence_threshold
+            } if data_source == "low_confidence" else {}
         }
         self._save_json(round_dir / "hog_clusters.json", clusters_data)
         
@@ -420,6 +496,9 @@ class MultiClusteringManager:
         history["rounds"].append({
             "round": new_round,
             "date": datetime.datetime.now().isoformat(),
+            "type": "clustering",
+            "data_source": data_source,
+            "confidence_threshold": confidence_threshold if data_source == "low_confidence" else None,
             "algorithm": method,
             "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
