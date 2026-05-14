@@ -922,8 +922,16 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.prelabel-card:hover {
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+.prelabel-card:hover,
+.prelabel-card.high-confidence:hover,
+.prelabel-card.medium-confidence:hover,
+.prelabel-card.low-confidence:hover,
+.prelabel-card.confirmed:hover,
+.prelabel-card.skipped:hover,
+.prelabel-card:not(.confirmed):not(.skipped):hover {
+  border-color: #1890ff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25);
 }
 
 .prelabel-card.selected {
