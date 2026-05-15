@@ -570,14 +570,12 @@ class DataStore:
         self._save_file(self.image_to_char_path, image_to_char)
     
     def _validate_update(self, char_id: str, new_char: str) -> bool:
-        """验证更新：防止一张图片对应多个汉字"""
+        """验证更新：允许修改已有标签（覆盖模式）"""
         image_to_char = self.get_image_to_char()
         current_char = image_to_char.get(char_id)
         
         if current_char and current_char != new_char:
-            raise ValueError(
-                f"图片 {char_id} 已有标签 '{current_char}', 不能改为 '{new_char}'"
-            )
+            logger.info(f"[validate_update] 覆盖已有标签: {char_id}, '{current_char}' -> '{new_char}'")
         
         return True
     
@@ -619,12 +617,12 @@ class DataStore:
     def _sync_to_multi_clustering(self, char_id: str, char: str):
         """同步标注到多轮聚类数据"""
         if not self.multi_clustering_dir.exists():
-            self._logger.log_sync_skipped(char_id, char, "多轮聚类目录不存在")
+            logger.debug(f"[sync_to_mc] 跳过: 多轮聚类目录不存在, char_id={char_id}")
             return
         
         rounds_dir = self.multi_clustering_dir / "rounds"
         if not rounds_dir.exists():
-            self._logger.log_sync_skipped(char_id, char, "rounds目录不存在")
+            logger.debug(f"[sync_to_mc] 跳过: rounds目录不存在, char_id={char_id}")
             return
         
         found = False
@@ -634,19 +632,30 @@ class DataStore:
             
             round_num = int(round_dir.name.replace("round_", "")) if "round_" in round_dir.name else 0
             
-            labels_path = round_dir / "labeling" / "labels.json"
+            labels_path = round_dir / "labels.json"
             clusters_path = round_dir / "hog_clusters.json"
             
-            if not clusters_path.exists() or not labels_path.exists():
+            if not clusters_path.exists():
+                logger.debug(f"[sync_to_mc] round_{round_num}: hog_clusters.json 不存在")
+                continue
+            if not labels_path.exists():
+                logger.debug(f"[sync_to_mc] round_{round_num}: labels.json 不存在")
                 continue
             
             clusters_data = self._load_file(clusters_path)
             clusters = clusters_data.get("clusters", {})
-            labels = self._load_file(labels_path)
+            labels_data = self._load_file(labels_path)
             
+            if "labels" not in labels_data:
+                labels_data["labels"] = {}
+            labels = labels_data["labels"]
+            
+            round_found = False
             for cluster_id, chars_in_cluster in clusters.items():
                 for idx, char_info in enumerate(chars_in_cluster):
                     if char_info.get("char_id") == char_id:
+                        logger.debug(f"[sync_to_mc] 找到字符: char_id={char_id}, char={char}, round={round_num}, cluster={cluster_id}, idx={idx}")
+                        
                         if cluster_id not in labels:
                             labels[cluster_id] = {
                                 "char": char,
@@ -657,20 +666,26 @@ class DataStore:
                         labels[cluster_id]["status"] = "labeled"
                         if "char_labels" not in labels[cluster_id]:
                             labels[cluster_id]["char_labels"] = {}
-                        labels[cluster_id]["char_labels"][str(idx)] = {"char": char}
-                        self._save_file(labels_path, labels)
-                        self._logger.log_sync_to_multi(char_id, char, round_num, cluster_id, success=True)
+                        labels[cluster_id]["char_labels"][str(idx)] = {
+                            "char": char,
+                            "labeled_at": datetime.datetime.now().isoformat()
+                        }
+                        logger.info(f"[sync_to_mc] 同步成功: char_id={char_id}, char={char}, round={round_num}, cluster={cluster_id}")
                         found = True
-                        return
+                        round_found = True
+            
+            if round_found:
+                self._save_file(labels_path, labels_data)
         
         if not found:
-            self._logger.log_sync_skipped(char_id, char, "字符不在多轮聚类数据中")
+            logger.debug(f"[sync_to_mc] 字符不在多轮聚类数据中: char_id={char_id}, char={char}")
     
     def write_annotation(self, char_id: str, char: str, status: str = "labeled", 
                          source: str = "manual", changed_by: str = "user", comment: str = ""):
         """统一写入标注，自动同步所有数据源（带事务）"""
+        logger.info(f"[write_annotation] 开始: char_id={char_id}, char={char}, source={source}")
         try:
-            # 1. 写入WAL日志
+            logger.info(f"[write_annotation] 步骤1: 写入WAL日志")
             self._write_wal("update", {
                 "char_id": char_id,
                 "old_char": self.get_confirmed_annotations().get(char_id),
@@ -678,38 +693,49 @@ class DataStore:
                 "source": source
             })
             
-            # 2. 验证更新
+            logger.info(f"[write_annotation] 步骤2: 验证更新, char='{char}'")
             self._validate_update(char_id, char)
             
-            # 3. 更新统一标注并获取旧字符
+            logger.info(f"[write_annotation] 步骤3: 更新统一标注")
             old_char = self.update_unified_label(char_id, {
                 "char": char,
                 "status": status,
                 "source": source,
                 "updated_at": datetime.datetime.now().isoformat()
             })
+            logger.info(f"[write_annotation] 步骤3完成: old_char='{old_char}'")
             
-            # 4. 添加历史记录
+            logger.info(f"[write_annotation] 步骤4: 添加历史记录")
             self._add_history_record(char_id, old_char, char, changed_by, source, comment)
             
-            # 5. 更新索引
+            logger.info(f"[write_annotation] 步骤5: 更新索引")
             self._update_indexes(char_id, old_char, char)
             
-            # 6. 同步到其他数据源
+            logger.info(f"[write_annotation] 步骤6: 同步到其他数据源")
             self._sync_to_cluster_labels(char_id, char)
+            logger.info(f"[write_annotation] 步骤6a: 同步到聚类标注完成")
+            
             self.batch_confirm_prelabels([char_id])
+            logger.info(f"[write_annotation] 步骤6b: 确认预标注完成")
+            
+            self.correct_prelabel_char(char_id, char)
+            logger.info(f"[write_annotation] 步骤6c: 修正预标注字符完成")
+            
             self._logger.log_sync_to_prelabel(char_id, char, success=True)
             self._sync_to_multi_clustering(char_id, char)
+            logger.info(f"[write_annotation] 步骤6d: 同步到多轮聚类完成")
             
-            # 7. 原子提交（清理WAL）
+            self._sync_to_char_pool_labeled(char_id, char)
+            logger.info(f"[write_annotation] 步骤6e: 同步到字符池完成")
+            
             self._cleanup_wal()
-            
-            # 8. 清除缓存
             self._invalidate_dataset_cache()
             
+            logger.info(f"[write_annotation] 全部完成: char_id={char_id}, char='{char}'")
             self._logger.log_write_annotation(char_id, char, success=True)
             
         except Exception as e:
+            logger.error(f"[write_annotation] 失败: char_id={char_id}, char='{char}', error={e}", exc_info=True)
             self._logger.log_write_annotation(char_id, char, success=False, message=str(e))
             raise
     
@@ -718,6 +744,7 @@ class DataStore:
         if not annotations:
             return {"success_count": 0, "total_count": 0}
         
+        logger.info(f"[batch_write] 开始批量写入: count={len(annotations)}, source={source}")
         start_time = time.time()
         success_count = 0
         total_count = len(annotations)
@@ -758,6 +785,9 @@ class DataStore:
                     # 更新预标注状态
                     if "status" in prelabel_status:
                         prelabel_status["status"][char_id] = "confirmed"
+                    if "corrected_chars" not in prelabel_status:
+                        prelabel_status["corrected_chars"] = {}
+                    prelabel_status["corrected_chars"][char_id] = char
                     
                     success_count += 1
                 except Exception as e:
@@ -770,7 +800,22 @@ class DataStore:
             self._save_file(self.image_to_char_path, image_to_char)
             self._save_file(self.prelabel_status_path, prelabel_status)
             
-            # 5. 清理WAL和缓存
+            # 4.1 同步更新内存中的 _prelabel_status
+            self._prelabel_status = prelabel_status
+            self._prelabel_status_dirty = False
+            
+            # 5. 同步到字符池和多轮聚类
+            for ann in annotations:
+                try:
+                    char_id = ann.get("char_id") if isinstance(ann, dict) else ann.char_id
+                    char = ann.get("char") if isinstance(ann, dict) else ann.char
+                    logger.info(f"[batch_write] 同步到字符池和聚类: char_id={char_id}, char={char}")
+                    self._sync_to_char_pool_labeled(char_id, char)
+                    self._sync_to_multi_clustering(char_id, char)
+                except Exception as e:
+                    logger.warning(f"同步到字符池/聚类失败: {char_id}, {e}")
+            
+            # 6. 清理WAL和缓存
             self._cleanup_wal()
             self._invalidate_dataset_cache()
             
@@ -1048,9 +1093,12 @@ class DataStore:
             
             # 7. 从其他数据源移除
             self._remove_from_cluster_labels(char_id)
-            self._remove_from_multi_clustering(char_id)
             
-            # 8. 原子提交（清理WAL）
+            # 8. 同步到字符池和多轮聚类（恢复为未标注）
+            self._sync_to_char_pool_reset(char_id)
+            self._sync_reset_to_multi_clustering(char_id)
+            
+            # 9. 原子提交（清理WAL）
             self._cleanup_wal()
             
             # 9. 清除缓存
@@ -1073,19 +1121,36 @@ class DataStore:
                 char_id, None, None, changed_by, "skip", "跳过该预标注"
             )
             
+            # 同步到统一标注、字符池和多轮聚类
+            try:
+                self.update_unified_label(char_id, {
+                    "status": "skipped",
+                    "updated_at": datetime.datetime.now().isoformat()
+                })
+                self._sync_to_char_pool_skipped(char_id)
+                self._sync_skip_to_multi_clustering(char_id)
+            except Exception as e:
+                logger.warning(f"跳过同步失败: {char_id}, {e}")
+            
             logger.info(f"跳过预标注: {char_id}")
             
         except Exception as e:
             logger.error(f"跳过预标注失败: {char_id}, 错误: {e}")
             raise
     
-    def batch_skip_prelabels(self, char_ids: List[str], changed_by: str = "user"):
-        """批量跳过预标注"""
+    def batch_skip_prelabels(self, char_ids: List[str], changed_by: str = "user", sync_downstream: bool = True):
+        """批量跳过预标注
+        
+        Args:
+            char_ids: 字符ID列表
+            changed_by: 操作者
+            sync_downstream: 是否同步到下游（unified_labels, char_pool, multi_clustering）
+                             当由 MultiClusteringManager 调用时设为 False，由 Manager 统一调度同步
+        """
         if not char_ids:
             return
         
         try:
-            # 批量更新 prelabel_status
             status_data = self._load_file(self.prelabel_status_path, default={
                 "status": {}, "corrected_chars": {}
             })
@@ -1093,14 +1158,28 @@ class DataStore:
             for char_id in char_ids:
                 status_data["status"][char_id] = "skipped"
                 
-                # 添加历史记录
                 self._add_history_record(
                     char_id, None, None, changed_by, "skip", "批量跳过"
                 )
             
             self._save_file(self.prelabel_status_path, status_data)
             
-            logger.info(f"批量跳过预标注: {len(char_ids)} 条")
+            self._prelabel_status = status_data
+            self._prelabel_status_dirty = False
+            
+            if sync_downstream:
+                for char_id in char_ids:
+                    try:
+                        self.update_unified_label(char_id, {
+                            "status": "skipped",
+                            "updated_at": datetime.datetime.now().isoformat()
+                        })
+                        self._sync_to_char_pool_skipped(char_id)
+                        self._sync_skip_to_multi_clustering(char_id)
+                    except Exception as e:
+                        logger.warning(f"跳过同步失败: {char_id}, {e}")
+            
+            logger.info(f"批量跳过预标注: {len(char_ids)} 条, sync_downstream={sync_downstream}")
             
         except Exception as e:
             logger.error(f"批量跳过预标注失败, 错误: {e}")
@@ -1149,6 +1228,20 @@ class DataStore:
             # 保存到文件（同时也更新缓存）
             self._flush_prelabel_status()
             
+            # 同步到统一标注、字符池和多轮聚类
+            for char_id, new_char in char_updates.items():
+                try:
+                    self.update_unified_label(char_id, {
+                        "char": new_char,
+                        "status": "labeled",
+                        "source": "ocr_modify",
+                        "updated_at": datetime.datetime.now().isoformat()
+                    })
+                    self._sync_to_char_pool_labeled(char_id, new_char)
+                    self._sync_to_multi_clustering(char_id, new_char)
+                except Exception as e:
+                    logger.warning(f"修改同步失败: {char_id}, {e}")
+            
             logger.info(f"批量修改预标注: {success_count}/{len(char_updates)} 条成功")
             return success_count
             
@@ -1165,6 +1258,17 @@ class DataStore:
             self._add_history_record(
                 char_id, None, None, changed_by, "unskip", "取消跳过"
             )
+            
+            # 同步到统一标注、字符池和多轮聚类
+            try:
+                self.update_unified_label(char_id, {
+                    "status": "pending",
+                    "updated_at": datetime.datetime.now().isoformat()
+                })
+                self._sync_to_char_pool_reset(char_id)
+                self._sync_reset_to_multi_clustering(char_id)
+            except Exception as e:
+                logger.warning(f"取消跳过同步失败: {char_id}, {e}")
             
             logger.info(f"取消跳过预标注: {char_id}")
             
@@ -1209,6 +1313,19 @@ class DataStore:
             # 保存到文件（同时也更新缓存）
             self._flush_prelabel_status()
             
+            # 同步到统一标注、字符池和多轮聚类
+            try:
+                self.update_unified_label(char_id, {
+                    "char": new_char,
+                    "status": "labeled",
+                    "source": "ocr_modify",
+                    "updated_at": datetime.datetime.now().isoformat()
+                })
+                self._sync_to_char_pool_labeled(char_id, new_char)
+                self._sync_to_multi_clustering(char_id, new_char)
+            except Exception as e:
+                logger.warning(f"修改同步失败: {char_id}, {e}")
+            
             logger.info(f"单独修改预标注: {char_id} -> {new_char} 成功")
             return True
             
@@ -1251,6 +1368,8 @@ class DataStore:
         })
         status_data["status"][char_id] = status
         self._save_file(self.prelabel_status_path, status_data)
+        self._prelabel_status = status_data
+        self._prelabel_status_dirty = False
     
     def _update_prelabel_corrected(self, char_id: str, corrected_char: str):
         """更新预标注的修正字符，并同时设置状态为confirmed"""
@@ -1258,16 +1377,241 @@ class DataStore:
             "status": {}, "corrected_chars": {}
         })
         status_data["corrected_chars"][char_id] = corrected_char
-        # 同时设置状态为confirmed，这样刷新页面后状态也正确
         status_data["status"][char_id] = "confirmed"
         self._save_file(self.prelabel_status_path, status_data)
+        self._prelabel_status = status_data
+        self._prelabel_status_dirty = False
     
     def _remove_from_cluster_labels(self, char_id: str):
         """从聚类标注中移除（如果有）"""
-        # 这里可以实现删除聚类标注的逻辑
         pass
-    
-    def _remove_from_multi_clustering(self, char_id: str):
-        """从多轮聚类标注中移除（如果有）"""
-        # 这里可以实现删除多轮聚类标注的逻辑
-        pass
+
+    def _sync_to_char_pool_labeled(self, char_id: str, char: str):
+        """同步标注到字符池（标记为已标注）"""
+        all_chars_path = self.multi_clustering_dir / "char_pool" / "all_chars.json"
+        unlabeled_path = self.multi_clustering_dir / "char_pool" / "unlabeled.json"
+        labeled_path = self.multi_clustering_dir / "char_pool" / "labeled.json"
+
+        if not all_chars_path.exists():
+            logger.debug(f"[sync_char_pool_labeled] all_chars.json 不存在")
+            return
+
+        all_chars_data = self._load_file(all_chars_path)
+        chars = all_chars_data.get("chars", {})
+
+        if char_id not in chars:
+            logger.debug(f"[sync_char_pool_labeled] char_id={char_id} 不在字符池中")
+            return
+
+        now = datetime.datetime.now().isoformat()
+        chars[char_id]["status"] = "labeled"
+        chars[char_id]["labeled_char"] = char
+        chars[char_id]["updated_at"] = now
+
+        all_chars_data["chars"] = chars
+        all_chars_data["updated_at"] = now
+        self._save_file(all_chars_path, all_chars_data)
+        logger.info(f"[sync_char_pool_labeled] 成功: char_id={char_id}, char={char}")
+
+        if unlabeled_path.exists():
+            unlabeled_data = self._load_file(unlabeled_path)
+            char_ids = unlabeled_data.get("char_ids", [])
+            if char_id in char_ids:
+                char_ids.remove(char_id)
+                unlabeled_data["char_ids"] = char_ids
+                unlabeled_data["count"] = len(char_ids)
+                unlabeled_data["updated_at"] = now
+                self._save_file(unlabeled_path, unlabeled_data)
+
+        if labeled_path.exists():
+            labeled_data = self._load_file(labeled_path)
+            labeled_ids = set(labeled_data.get("char_ids", []))
+            labeled_ids.add(char_id)
+            labeled_data["char_ids"] = list(labeled_ids)
+            labeled_data["count"] = len(labeled_ids)
+            labeled_data["updated_at"] = now
+            self._save_file(labeled_path, labeled_data)
+
+    def _sync_to_char_pool_skipped(self, char_id: str):
+        """同步跳过状态到字符池"""
+        all_chars_path = self.multi_clustering_dir / "char_pool" / "all_chars.json"
+        unlabeled_path = self.multi_clustering_dir / "char_pool" / "unlabeled.json"
+        labeled_path = self.multi_clustering_dir / "char_pool" / "labeled.json"
+
+        if not all_chars_path.exists():
+            logger.debug(f"[sync_char_pool_skipped] all_chars.json 不存在")
+            return
+
+        all_chars_data = self._load_file(all_chars_path)
+        chars = all_chars_data.get("chars", {})
+
+        if char_id not in chars:
+            logger.debug(f"[sync_char_pool_skipped] char_id={char_id} 不在字符池中")
+            return
+
+        now = datetime.datetime.now().isoformat()
+        chars[char_id]["status"] = "skipped"
+        chars[char_id]["updated_at"] = now
+
+        all_chars_data["chars"] = chars
+        all_chars_data["updated_at"] = now
+        self._save_file(all_chars_path, all_chars_data)
+        logger.info(f"[sync_char_pool_skipped] 成功: char_id={char_id}")
+
+        if unlabeled_path.exists():
+            unlabeled_data = self._load_file(unlabeled_path)
+            char_ids = unlabeled_data.get("char_ids", [])
+            if char_id in char_ids:
+                char_ids.remove(char_id)
+                unlabeled_data["char_ids"] = char_ids
+                unlabeled_data["count"] = len(char_ids)
+                unlabeled_data["updated_at"] = now
+                self._save_file(unlabeled_path, unlabeled_data)
+
+        if labeled_path.exists():
+            labeled_data = self._load_file(labeled_path)
+            labeled_ids = set(labeled_data.get("char_ids", []))
+            if char_id in labeled_ids:
+                labeled_ids.remove(char_id)
+                labeled_data["char_ids"] = list(labeled_ids)
+                labeled_data["count"] = len(labeled_ids)
+                labeled_data["updated_at"] = now
+                self._save_file(labeled_path, labeled_data)
+
+    def _sync_to_char_pool_reset(self, char_id: str):
+        """同步重置状态到字符池（恢复为未标注）"""
+        all_chars_path = self.multi_clustering_dir / "char_pool" / "all_chars.json"
+        unlabeled_path = self.multi_clustering_dir / "char_pool" / "unlabeled.json"
+        labeled_path = self.multi_clustering_dir / "char_pool" / "labeled.json"
+
+        if not all_chars_path.exists():
+            logger.debug(f"[sync_char_pool_reset] all_chars.json 不存在")
+            return
+
+        all_chars_data = self._load_file(all_chars_path)
+        chars = all_chars_data.get("chars", {})
+
+        if char_id not in chars:
+            logger.debug(f"[sync_char_pool_reset] char_id={char_id} 不在字符池中")
+            return
+
+        now = datetime.datetime.now().isoformat()
+        chars[char_id]["status"] = "unlabeled"
+        chars[char_id]["labeled_char"] = None
+        chars[char_id]["labeled_round"] = None
+        chars[char_id]["updated_at"] = now
+
+        all_chars_data["chars"] = chars
+        all_chars_data["updated_at"] = now
+        self._save_file(all_chars_path, all_chars_data)
+        logger.info(f"[sync_char_pool_reset] 成功: char_id={char_id}")
+
+        if labeled_path.exists():
+            labeled_data = self._load_file(labeled_path)
+            labeled_ids = set(labeled_data.get("char_ids", []))
+            if char_id in labeled_ids:
+                labeled_ids.remove(char_id)
+                labeled_data["char_ids"] = list(labeled_ids)
+                labeled_data["count"] = len(labeled_ids)
+                labeled_data["updated_at"] = now
+                self._save_file(labeled_path, labeled_data)
+
+        if unlabeled_path.exists():
+            unlabeled_data = self._load_file(unlabeled_path)
+            char_ids = unlabeled_data.get("char_ids", [])
+            if char_id not in char_ids:
+                char_ids.append(char_id)
+                unlabeled_data["char_ids"] = char_ids
+                unlabeled_data["count"] = len(char_ids)
+                unlabeled_data["updated_at"] = now
+                self._save_file(unlabeled_path, unlabeled_data)
+
+    def _sync_skip_to_multi_clustering(self, char_id: str):
+        """同步跳过状态到多轮聚类标注"""
+        if not self.multi_clustering_dir.exists():
+            return
+
+        rounds_dir = self.multi_clustering_dir / "rounds"
+        if not rounds_dir.exists():
+            return
+
+        for round_dir in rounds_dir.iterdir():
+            if not round_dir.is_dir():
+                continue
+
+            round_num = int(round_dir.name.replace("round_", "")) if "round_" in round_dir.name else 0
+            labels_path = round_dir / "labels.json"
+            clusters_path = round_dir / "hog_clusters.json"
+
+            if not clusters_path.exists() or not labels_path.exists():
+                continue
+
+            clusters_data = self._load_file(clusters_path)
+            clusters = clusters_data.get("clusters", {})
+            labels_data = self._load_file(labels_path)
+
+            if "labels" not in labels_data:
+                labels_data["labels"] = {}
+            labels = labels_data["labels"]
+
+            round_found = False
+            for cluster_id, chars_in_cluster in clusters.items():
+                for idx, char_info in enumerate(chars_in_cluster):
+                    if char_info.get("char_id") == char_id:
+                        if cluster_id not in labels:
+                            labels[cluster_id] = {"status": "skipped", "char_labels": {}}
+                        if "char_labels" not in labels[cluster_id]:
+                            labels[cluster_id]["char_labels"] = {}
+                        labels[cluster_id]["char_labels"][str(idx)] = {"status": "skipped"}
+                        if labels[cluster_id].get("status") != "labeled":
+                            labels[cluster_id]["status"] = "skipped"
+                        logger.info(f"[sync_skip_to_mc] 同步跳过: char_id={char_id}, round={round_num}, cluster={cluster_id}")
+                        round_found = True
+
+            if round_found:
+                self._save_file(labels_path, labels_data)
+
+    def _sync_reset_to_multi_clustering(self, char_id: str):
+        """同步重置状态到多轮聚类标注（恢复为未标注）"""
+        if not self.multi_clustering_dir.exists():
+            return
+
+        rounds_dir = self.multi_clustering_dir / "rounds"
+        if not rounds_dir.exists():
+            return
+
+        for round_dir in rounds_dir.iterdir():
+            if not round_dir.is_dir():
+                continue
+
+            round_num = int(round_dir.name.replace("round_", "")) if "round_" in round_dir.name else 0
+            labels_path = round_dir / "labels.json"
+            clusters_path = round_dir / "hog_clusters.json"
+
+            if not clusters_path.exists() or not labels_path.exists():
+                continue
+
+            clusters_data = self._load_file(clusters_path)
+            clusters = clusters_data.get("clusters", {})
+            labels_data = self._load_file(labels_path)
+
+            if "labels" not in labels_data:
+                labels_data["labels"] = {}
+            labels = labels_data["labels"]
+
+            round_found = False
+            for cluster_id, chars_in_cluster in clusters.items():
+                for idx, char_info in enumerate(chars_in_cluster):
+                    if char_info.get("char_id") == char_id:
+                        char_key = str(idx)
+                        if cluster_id in labels and "char_labels" in labels[cluster_id]:
+                            if char_key in labels[cluster_id]["char_labels"]:
+                                del labels[cluster_id]["char_labels"][char_key]
+                                if not labels[cluster_id]["char_labels"]:
+                                    labels[cluster_id]["status"] = "unlabeled"
+                                    labels[cluster_id]["char"] = None
+                                logger.info(f"[sync_reset_to_mc] 同步重置: char_id={char_id}, round={round_num}, cluster={cluster_id}")
+                                round_found = True
+
+            if round_found:
+                self._save_file(labels_path, labels_data)
