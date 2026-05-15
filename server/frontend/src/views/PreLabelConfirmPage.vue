@@ -322,6 +322,13 @@ const loadPreLabels = async () => {
     })
     if (res.data.code === 0) {
       prelabels.value = res.data.data || []
+      const confirmedItems = prelabels.value.filter(p => p.status === 'confirmed')
+      const skippedItems = prelabels.value.filter(p => p.status === 'skipped')
+      const correctedItems = prelabels.value.filter(p => p.corrected_char)
+      console.log(`[prelabel] 加载数据: char=${char}, total=${prelabels.value.length}, confirmed=${confirmedItems.length}, skipped=${skippedItems.length}, corrected=${correctedItems.length}`)
+      if (correctedItems.length > 0) {
+        console.log(`[prelabel] 修正字符示例:`, correctedItems.slice(0, 3).map(p => ({ char_id: p.char_id, predicted: p.predicted_char, corrected: p.corrected_char, status: p.status })))
+      }
     }
   } catch (err) {
     console.error('加载预标注失败:', err)
@@ -943,11 +950,11 @@ onUnmounted(() => {
 
 .prelabel-card.confirmed {
   background: #f6ffed;
-  /* 边框颜色保持置信度的颜色 */
+  border-color: #52c41a !important;
 }
 
 .prelabel-card.skipped {
-  border-color: #d9d9d9;
+  border-color: #d9d9d9 !important;
   background: #fafafa;
   opacity: 0.7;
 }

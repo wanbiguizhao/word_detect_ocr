@@ -117,6 +117,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import axios from 'axios'
 
 const route = useRoute()
@@ -272,23 +273,29 @@ const loadData = async () => {
     const res = await axios.get(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}`)
     if (res.data.code === 0) {
       const data = res.data
-      images.value = (data.chars || []).map((char, index) => ({
-        index,
-        char_id: char.char_id,
-        label: char.label || '',
-        line_name: char.line_name,
-        col_start: char.col_start,
-        col_end: char.col_end,
-        char_status: char.char_status || 'unlabeled',
-        predicted_char: char.predicted_char || null,
-        confidence: char.confidence || null,
-        confidence_level: char.confidence_level || null,
-        lineage: {
+      console.log(`[mc-label] 加载聚类数据: round=${round.value}, cluster=${clusterId.value}, status=${data.status}, char=${data.char}`)
+      images.value = (data.chars || []).map((char, index) => {
+        if (char.char_status === 'labeled' || char.label) {
+          console.log(`[mc-label] 已标注字符: idx=${index}, char_id=${char.char_id}, label=${char.label}, char_status=${char.char_status}`)
+        }
+        return {
+          index,
+          char_id: char.char_id,
+          label: char.label || '',
           line_name: char.line_name,
           col_start: char.col_start,
-          col_end: char.col_end
+          col_end: char.col_end,
+          char_status: char.char_status || 'unlabeled',
+          predicted_char: char.predicted_char || null,
+          confidence: char.confidence || null,
+          confidence_level: char.confidence_level || null,
+          lineage: {
+            line_name: char.line_name,
+            col_start: char.col_start,
+            col_end: char.col_end
+          }
         }
-      }))
+      })
 
       charsDisplay.value = data.char || ''
     }
@@ -395,6 +402,7 @@ const saveLabel = async (img) => {
     delete pendingLabels.value[img.index]
   } catch (err) {
     console.error('保存标签失败:', err)
+    message.error(err.response?.data?.detail || '保存失败')
   }
 }
 
@@ -403,7 +411,6 @@ const saveAll = async () => {
 
   saving.value = true
   try {
-    // 使用批量提交接口
     const labels = selectedIndices.value.map(index => ({
       charIndex: index,
       char: batchChar.value
@@ -425,6 +432,7 @@ const saveAll = async () => {
     await loadData()
   } catch (err) {
     console.error('批量保存失败:', err)
+    message.error(err.response?.data?.detail || '批量保存失败')
   } finally {
     saving.value = false
   }
