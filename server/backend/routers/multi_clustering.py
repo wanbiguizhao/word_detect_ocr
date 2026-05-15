@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+import logging
 from services.multi_clustering_manager import MultiClusteringManager
 from services.char_pool_manager import CharPoolManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mc", tags=["多轮聚类"])
 
@@ -167,6 +170,7 @@ def get_cluster_detail(round_num: int, cluster_id: str):
             raise HTTPException(status_code=404, detail=f"聚类 {cluster_id} 不存在")
 
         cluster_labels = labels.get("labels", {}).get(cluster_id, {}) if labels else {}
+        logger.info(f"[mc_detail] round={round_num}, cluster={cluster_id}, cluster_labels={cluster_labels}")
 
         all_chars = manager.char_pool.load_all_chars()
 
@@ -221,14 +225,22 @@ def get_cluster_detail(round_num: int, cluster_id: str):
 def save_cluster_label(round_num: int, cluster_id: str, body: LabelItem):
     """保存单个标注"""
     try:
+        print(f"[API] save_cluster_label: round={round_num}, cluster={cluster_id}, charIndex={body.charIndex}, char='{body.char}'")
         manager = MultiClusteringManager()
         success = manager.save_label(round_num, cluster_id, body.charIndex, body.char)
 
         if success:
+            print(f"[API] save_cluster_label 成功")
             return {"code": 0, "msg": "保存成功"}
         else:
+            print(f"[API] save_cluster_label 返回False")
             raise HTTPException(status_code=500, detail="保存失败")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[API] save_cluster_label 异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
