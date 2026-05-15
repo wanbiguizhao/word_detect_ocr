@@ -531,6 +531,11 @@ class MultiClusteringManager:
     def save_label(self, round_num: int, cluster_id: str, 
                    char_index: int, char: str) -> bool:
         """保存标注 - 支持传播更新到所有相关数据源"""
+        print(f"[save_label] 开始: round={round_num}, cluster={cluster_id}, char_index={char_index}, char='{char}'")
+        
+        if not char:
+            raise ValueError("标注不能为空")
+        
         round_dir = self.rounds_dir / f"round_{round_num}"
         labels_path = round_dir / "labels.json"
         
@@ -542,11 +547,9 @@ class MultiClusteringManager:
         if labels_data is None:
             labels_data = {"labels": {}}
         
-        # 确保labels字段存在
         if "labels" not in labels_data:
             labels_data["labels"] = {}
         
-        # 确保cluster_id存在
         if cluster_id not in labels_data["labels"]:
             labels_data["labels"][cluster_id] = {
                 "char": None,
@@ -564,7 +567,6 @@ class MultiClusteringManager:
             "labeled_at": datetime.datetime.now().isoformat()
         }
         
-        # 更新统计
         all_chars = [v["char"] for v in labels_data["labels"][cluster_id]["char_labels"].values() if v.get("char")]
         if all_chars:
             from collections import Counter
@@ -575,10 +577,9 @@ class MultiClusteringManager:
             labels_data["labels"][cluster_id]["chars"] = dict(char_counts)
             labels_data["labels"][cluster_id]["status"] = "labeled"
         
-        # 保存标注到本地文件
         self._save_json(labels_path, labels_data)
+        print(f"[save_label] 本地标注已保存: cluster={cluster_id}, char_index={char_index}, char='{char}'")
         
-        # 获取字符ID
         char_id = None
         try:
             clusters_data = self.get_round_clusters(round_num)
@@ -586,21 +587,29 @@ class MultiClusteringManager:
                 cluster_chars = clusters_data.get("clusters", {}).get(cluster_id, [])
                 if char_index < len(cluster_chars):
                     char_id = cluster_chars[char_index].get("char_id")
+                    print(f"[save_label] 获取到char_id: {char_id}")
+                else:
+                    print(f"[save_label] 警告: char_index={char_index} 超出范围, cluster_chars长度={len(cluster_chars)}")
         except Exception as e:
-            # 忽略获取字符ID的错误，继续保存标注
+            print(f"[save_label] 获取char_id异常: {e}")
             pass
         
         if char_id:
-            # 更新字符池
-            self.char_pool.mark_as_labeled(char_id, char, round_num)
+            print(f"[save_label] 开始同步: char_id={char_id}, char='{char}'")
+            try:
+                self.char_pool.mark_as_labeled(char_id, char, round_num)
+                print(f"[save_label] 字符池同步完成")
+            except Exception as e:
+                print(f"[save_label] 字符池同步失败: {e}")
             
-            # 使用 DataStore 实现传播更新
-            # 这将自动同步到：
-            # 1. unified_labels.json（统一标注）
-            # 2. clusters/labeling/labels.json（聚类标注）
-            # 3. pre_labels.json（预标注状态）
-            # 4. multi_clustering/ 中的其他轮次（如果字符存在）
-            self.data_store.write_annotation(char_id, char)
+            try:
+                self.data_store.write_annotation(char_id, char)
+                print(f"[save_label] DataStore同步完成")
+            except Exception as e:
+                print(f"[save_label] DataStore同步失败: {e}")
+                raise
+        else:
+            print(f"[save_label] 警告: 未获取到char_id, 跳过同步")
         
         return True
     
@@ -632,20 +641,24 @@ class MultiClusteringManager:
     def save_batch_labels(self, round_num: int, cluster_id: str, 
                           labels: List[Dict[str, Any]]) -> int:
         """批量保存标注 - 优化版本：一次性写入文件和同步"""
+        print(f"[save_batch_labels] 开始: round={round_num}, cluster={cluster_id}, labels_count={len(labels)}")
+        for label in labels:
+            char = label.char if hasattr(label, 'char') else label.get("char")
+            if not char:
+                raise ValueError("标注不能为空")
+        
         round_dir = self.rounds_dir / f"round_{round_num}"
         labels_path = round_dir / "labels.json"
         
         if not labels_path.exists():
             return 0
         
-        # 一次性加载标签数据
         labels_data = self._load_json(labels_path)
         if labels_data is None:
             labels_data = {"labels": {}}
         if "labels" not in labels_data:
             labels_data["labels"] = {}
         
-        # 确保cluster_id存在
         if cluster_id not in labels_data["labels"]:
             labels_data["labels"][cluster_id] = {
                 "char": None,
@@ -656,12 +669,9 @@ class MultiClusteringManager:
                 "char_labels": {}
             }
         
-        # 收集需要同步的字符ID
         chars_to_sync = []
         
-        # 批量更新标签（支持字典和Pydantic对象）
         for label in labels:
-            # 支持字典和Pydantic对象
             if hasattr(label, 'charIndex'):
                 char_index = label.charIndex
                 char = label.char
@@ -677,7 +687,6 @@ class MultiClusteringManager:
                 }
                 chars_to_sync.append((char_index, char))
         
-        # 更新统计
         all_chars = [v["char"] for v in labels_data["labels"][cluster_id]["char_labels"].values() if v.get("char")]
         if all_chars:
             from collections import Counter
@@ -858,7 +867,15 @@ class MultiClusteringManager:
         return {"skipped": len(valid_ids), "total": len(char_ids)}
     
     def _sync_skip_to_all(self, char_ids: List[str], round_num: int):
-        """跳过操作同步到所有数据系统（批量优化版）"""
+        """跳过操作同步到所有数据系统（批量优化版）
+        
+        同步范围（按文档要求）：
+        1. char_pool: all_chars.json → skipped, unlabeled.json → 移除, labeled.json → 移除
+        2. pre_labels.json: status → skipped
+        3. prelabel_status.json: status → skipped
+        4. unified_labels.json: status → skipped
+        5. round_N/labels.json: char_labels → skipped (遍历所有轮次)
+        """
         if not char_ids:
             return
         
@@ -868,11 +885,15 @@ class MultiClusteringManager:
         # 2. OCR系统: 批量更新 pre_labels.json
         self._update_prelabels_status(char_ids, "skipped")
         
-        # 3. OCR系统: 批量更新 prelabel_status.json
-        self.data_store.batch_skip_prelabels(char_ids)
+        # 3. OCR系统: 批量更新 prelabel_status.json（仅状态，不同步下游）
+        self.data_store.batch_skip_prelabels(char_ids, sync_downstream=False)
         
         # 4. 统一标记: 批量更新 unified_labels.json
         self._update_unified_labels_status(char_ids, "skipped")
+        
+        # 5. 多轮聚类: 遍历所有轮次更新 round labels
+        for char_id in char_ids:
+            self.data_store._sync_skip_to_multi_clustering(char_id)
         
         print(f"[Manager] 跳过同步完成: {len(char_ids)} 个字符已同步到所有数据系统")
     
@@ -914,10 +935,12 @@ class MultiClusteringManager:
     def _sync_unskip_to_all(self, char_ids: List[str], round_num: int):
         """撤回跳过操作同步到所有数据系统
         
-        确保以下三个系统的一致性：
-        1. 聚类系统: char_pool (all_chars.json, labeled.json, unlabeled.json)
-        2. OCR系统: pre_labels.json + prelabel_status.json
-        3. 统一标记: unified_labels.json
+        同步范围（按文档要求）：
+        1. char_pool: all_chars.json → unlabeled, unlabeled.json → 添加, labeled.json → 移除
+        2. pre_labels.json: status → pending
+        3. prelabel_status.json: status → pending
+        4. unified_labels.json: status → pending
+        5. round_N/labels.json: 删除 char_labels 条目, 如无其他标注则 cluster status → unlabeled (遍历所有轮次)
         
         Args:
             char_ids: 要撤回跳过的字符ID列表
@@ -939,6 +962,10 @@ class MultiClusteringManager:
         
         # 4. 统一标记: 更新 unified_labels.json（重置为无状态或删除状态字段）
         self._update_unified_labels_status(char_ids, "pending")
+        
+        # 5. 多轮聚类: 遍历所有轮次更新 round labels
+        for char_id in char_ids:
+            self.data_store._sync_reset_to_multi_clustering(char_id)
         
         print(f"[Manager] 撤回跳过同步完成: {len(char_ids)} 个字符已同步到所有数据系统")
     

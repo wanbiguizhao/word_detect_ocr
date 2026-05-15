@@ -244,7 +244,6 @@ class CharPoolManager:
             all_chars[char_id]["labeled_round"] = round_num
             all_chars[char_id]["updated_at"] = datetime.datetime.now().isoformat()
             
-            # 保存
             self._save_json(self.all_chars_path, {
                 "version": "1.0",
                 "total_count": len(all_chars),
@@ -252,7 +251,6 @@ class CharPoolManager:
                 "chars": all_chars
             })
             
-            # 从未标注列表移除
             unlabeled_ids = self.get_unlabeled_char_ids()
             if char_id in unlabeled_ids:
                 unlabeled_ids.remove(char_id)
@@ -261,6 +259,16 @@ class CharPoolManager:
                     "count": len(unlabeled_ids),
                     "updated_at": datetime.datetime.now().isoformat(),
                     "char_ids": unlabeled_ids
+                })
+            
+            labeled_ids = self.get_labeled_char_ids()
+            if char_id in labeled_ids:
+                labeled_ids.remove(char_id)
+                self._save_json(self.labeled_path, {
+                    "version": "1.0",
+                    "count": len(labeled_ids),
+                    "updated_at": datetime.datetime.now().isoformat(),
+                    "char_ids": list(labeled_ids)
                 })
         
         return True
@@ -335,6 +343,16 @@ class CharPoolManager:
                 "count": len(new_unlabeled),
                 "updated_at": now,
                 "char_ids": new_unlabeled
+            })
+        
+        labeled_ids = self.get_labeled_char_ids()
+        new_labeled = labeled_ids - char_id_set
+        if len(new_labeled) != len(labeled_ids):
+            self._save_json(self.labeled_path, {
+                "version": "1.0",
+                "count": len(new_labeled),
+                "updated_at": now,
+                "char_ids": list(new_labeled)
             })
     
     def get_stats(self) -> dict:
