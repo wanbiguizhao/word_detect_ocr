@@ -1559,12 +1559,10 @@ class DataStore:
                 for idx, char_info in enumerate(chars_in_cluster):
                     if char_info.get("char_id") == char_id:
                         if cluster_id not in labels:
-                            labels[cluster_id] = {"status": "skipped", "char_labels": {}}
+                            labels[cluster_id] = {"status": "unlabeled", "char_labels": {}}
                         if "char_labels" not in labels[cluster_id]:
                             labels[cluster_id]["char_labels"] = {}
                         labels[cluster_id]["char_labels"][str(idx)] = {"status": "skipped"}
-                        if labels[cluster_id].get("status") != "labeled":
-                            labels[cluster_id]["status"] = "skipped"
                         logger.info(f"[sync_skip_to_mc] 同步跳过: char_id={char_id}, round={round_num}, cluster={cluster_id}")
                         round_found = True
 

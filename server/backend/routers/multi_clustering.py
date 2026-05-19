@@ -116,26 +116,54 @@ def get_round_clusters(round_num: int):
             raise HTTPException(status_code=404, detail=f"轮次 {round_num} 不存在")
 
         cluster_list = []
+        all_chars = manager.char_pool.load_all_chars()
         for cluster_id, chars in clusters.get("clusters", {}).items():
             labels = manager.get_round_labels(round_num)
             cluster_labels = labels.get("labels", {}).get(cluster_id, {}) if labels else {}
 
-            # 统计已标注字符数量和汉字分布
             char_labels = cluster_labels.get("char_labels", {})
-            labeled_count = sum(1 for v in char_labels.values() if v.get("char"))
 
-            # 统计每个汉字的数量
+            labeled_count = 0
+            skipped_count = 0
+            for idx, char_info in enumerate(chars):
+                char_id = char_info.get("char_id", "")
+                char_status = all_chars.get(char_id, {}).get("status", "unlabeled")
+                if char_status == "skipped":
+                    skipped_count += 1
+                else:
+                    char_key = str(idx)
+                    if char_labels.get(char_key, {}).get("char"):
+                        labeled_count += 1
+
+            remaining_count = len(chars) - labeled_count - skipped_count
+
+            if remaining_count == 0 and skipped_count > 0 and labeled_count == 0:
+                effective_status = "skipped"
+            elif remaining_count == 0 and labeled_count > 0:
+                effective_status = "labeled"
+            elif labeled_count > 0 or skipped_count > 0:
+                effective_status = "partial"
+            else:
+                effective_status = "unlabeled"
+
             char_counts = {}
-            for v in char_labels.values():
+            for idx, v in char_labels.items():
                 char = v.get("char")
-                if char:
-                    char_counts[char] = char_counts.get(char, 0) + 1
+                if not char:
+                    continue
+                char_idx = int(idx) if isinstance(idx, str) else idx
+                if char_idx < len(chars):
+                    char_id = chars[char_idx].get("char_id", "")
+                    if all_chars.get(char_id, {}).get("status") != "skipped":
+                        char_counts[char] = char_counts.get(char, 0) + 1
 
             cluster_list.append({
                 "cluster_id": cluster_id,
                 "char_count": len(chars),
                 "labeled_count": labeled_count,
-                "status": cluster_labels.get("status", "unlabeled"),
+                "skipped_count": skipped_count,
+                "remaining_count": remaining_count,
+                "status": effective_status,
                 "char": cluster_labels.get("char"),
                 "char_counts": char_counts,
                 "confidence": cluster_labels.get("confidence")
@@ -337,6 +365,21 @@ def get_char_pool_stats():
             "code": 0,
             "msg": "success",
             "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/low-confidence-estimate")
+def estimate_low_confidence_count(confidence_threshold: float = Query(0.7, ge=0.1, le=0.95)):
+    """预估低置信度未标记字符数量"""
+    try:
+        manager = MultiClusteringManager()
+        result = manager.estimate_low_confidence_count(confidence_threshold)
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": result
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

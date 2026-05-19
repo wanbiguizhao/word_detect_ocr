@@ -282,7 +282,13 @@ class MultiClusteringManager:
         """获取低置信度预测的字符ID列表
         
         从 pre_labels.json 中筛选 confidence < threshold 的字符，
-        排除已标注和已跳过的字符，确保数据一致性。
+        排除已标注、已跳过、已确认的字符，确保数据一致性。
+        
+        筛选条件：
+        1. confidence < confidence_threshold（低于置信度阈值）
+        2. 不在 labeled_ids 中（未标注）
+        3. 不在 skipped_ids 中（未跳过）
+        4. 不在 confirmed_ids 中（未在预标注页面确认过）
         
         Args:
             confidence_threshold: 置信度阈值，低于此值的字符被选中
@@ -304,6 +310,14 @@ class MultiClusteringManager:
         all_chars = self.char_pool.load_all_chars()
         skipped_ids = {char_id for char_id, info in all_chars.items() if info.get("status") == "skipped"}
         
+        prelabel_status_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / ".meta" / "prelabel_status.json"
+        confirmed_ids = set()
+        if prelabel_status_path.exists():
+            with open(prelabel_status_path, 'r', encoding='utf-8') as f:
+                prelabel_status = json.load(f)
+            status_map = prelabel_status.get("status", {})
+            confirmed_ids = {char_id for char_id, st in status_map.items() if st == "confirmed"}
+        
         low_conf_ids = []
         for p in prelabels:
             char_id = p.get("char_id", "")
@@ -315,20 +329,77 @@ class MultiClusteringManager:
                 continue
             if char_id in skipped_ids:
                 continue
+            if char_id in confirmed_ids:
+                continue
             if confidence < confidence_threshold:
                 low_conf_ids.append(char_id)
         
         if not low_conf_ids:
             raise ValueError(
-                f"没有置信度低于 {confidence_threshold} 的未处理字符 "
-                f"(预标注总数: {len(prelabels)}, 已标注: {len(labeled_ids)}, 已跳过: {len(skipped_ids)})"
+                f"没有置信度低于 {confidence_threshold} 的未标记字符 "
+                f"(预标注总数: {len(prelabels)}, 已标注: {len(labeled_ids)}, "
+                f"已跳过: {len(skipped_ids)}, 已确认: {len(confirmed_ids)})"
             )
         
         print(f"[Manager] 低置信度筛选: 阈值={confidence_threshold}, "
               f"预标注总数={len(prelabels)}, 已标注={len(labeled_ids)}, "
-              f"已跳过={len(skipped_ids)}, 低置信度未处理={len(low_conf_ids)}")
+              f"已跳过={len(skipped_ids)}, 已确认={len(confirmed_ids)}, "
+              f"低置信度未标记={len(low_conf_ids)}")
         
         return low_conf_ids
+
+    def estimate_low_confidence_count(self, confidence_threshold: float = 0.7) -> dict:
+        """预估低置信度未标记字符数量（不抛异常，用于前端预览）
+        
+        Args:
+            confidence_threshold: 置信度阈值
+            
+        Returns:
+            dict: { count, total_prelabels, labeled, skipped, confirmed }
+        """
+        prelabels_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / "pre_labels.json"
+        
+        if not prelabels_path.exists():
+            return {"count": 0, "total_prelabels": 0, "labeled": 0, "skipped": 0, "confirmed": 0}
+        
+        with open(prelabels_path, 'r', encoding='utf-8') as f:
+            prelabels_data = json.load(f)
+        
+        prelabels = prelabels_data.get("prelabels", [])
+        labeled_ids = self.char_pool.get_labeled_char_ids()
+        all_chars = self.char_pool.load_all_chars()
+        skipped_ids = {char_id for char_id, info in all_chars.items() if info.get("status") == "skipped"}
+        
+        prelabel_status_path = self.project_root / "bussiness" / "datahome" / self.dataset_id / ".meta" / "prelabel_status.json"
+        confirmed_ids = set()
+        if prelabel_status_path.exists():
+            with open(prelabel_status_path, 'r', encoding='utf-8') as f:
+                prelabel_status = json.load(f)
+            status_map = prelabel_status.get("status", {})
+            confirmed_ids = {char_id for char_id, st in status_map.items() if st == "confirmed"}
+        
+        count = 0
+        for p in prelabels:
+            char_id = p.get("char_id", "")
+            confidence = p.get("confidence", 1.0)
+            if not char_id:
+                continue
+            if char_id in labeled_ids:
+                continue
+            if char_id in skipped_ids:
+                continue
+            if char_id in confirmed_ids:
+                continue
+            if confidence < confidence_threshold:
+                count += 1
+        
+        return {
+            "count": count,
+            "total_prelabels": len(prelabels),
+            "labeled": len(labeled_ids),
+            "skipped": len(skipped_ids),
+            "confirmed": len(confirmed_ids)
+        }
 
     def start_new_round(self, n_clusters: Optional[int] = None, 
                         description: str = "",
@@ -739,14 +810,32 @@ class MultiClusteringManager:
         skipped_clusters = 0
         total_chars = clusters_data.get("total_chars", 0)
         labeled_chars = 0
+        skipped_chars = 0
+        
+        all_chars = self.char_pool.load_all_chars()
+        clusters = clusters_data.get("clusters", {})
         
         for cluster_id, cluster_info in labels_data.get("labels", {}).items():
             status = cluster_info.get("status", "unlabeled")
             if status == "labeled":
                 labeled_clusters += 1
-                labeled_chars += len(cluster_info.get("char_labels", {}))
+                for idx, v in cluster_info.get("char_labels", {}).items():
+                    if v.get("char"):
+                        char_idx = int(idx) if isinstance(idx, str) else idx
+                        cluster_chars = clusters.get(cluster_id, [])
+                        char_id = cluster_chars[char_idx].get("char_id", "") if char_idx < len(cluster_chars) else ""
+                        if all_chars.get(char_id, {}).get("status") != "skipped":
+                            labeled_chars += 1
             elif status == "skipped":
                 skipped_clusters += 1
+        
+        for cluster_id, cluster_chars in clusters.items():
+            for char_info in cluster_chars:
+                char_id = char_info.get("char_id", "")
+                if all_chars.get(char_id, {}).get("status") == "skipped":
+                    skipped_chars += 1
+        
+        remaining_chars = total_chars - labeled_chars - skipped_chars
         
         return {
             "round": round_num,
@@ -755,7 +844,9 @@ class MultiClusteringManager:
             "skipped_clusters": skipped_clusters,
             "remaining_clusters": total_clusters - labeled_clusters - skipped_clusters,
             "total_chars": total_chars,
-            "labeled_chars": labeled_chars
+            "labeled_chars": labeled_chars,
+            "skipped_chars": skipped_chars,
+            "remaining_chars": remaining_chars
         }
     
     def skip_cluster(self, round_num: int, cluster_id: str) -> bool:

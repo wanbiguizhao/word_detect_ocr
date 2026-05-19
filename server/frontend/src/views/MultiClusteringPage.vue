@@ -29,7 +29,7 @@
           </a-form-item>
           <div class="data-source-hint">
             <span v-if="data_source === 'unlabeled'">对尚未标注的汉字图片进行聚类，发现新的汉字类别</span>
-            <span v-else-if="data_source === 'low_confidence'">对OCR预测置信度较低的图片进行聚类审查</span>
+            <span v-else-if="data_source === 'low_confidence'">对OCR预测置信度较低且未标记的图片进行聚类审查</span>
             <span v-else-if="data_source === 'outlier'">检测已标注数据中可能的标注错误</span>
           </div>
         </div>
@@ -48,8 +48,14 @@
                 :step="0.05"
                 :marks="{ 0.1: '0.1', 0.5: '0.5', 0.7: '0.7', 0.95: '0.95' }"
                 style="width: 300px;"
+                @change="onConfidenceThresholdChange"
               />
-              <span class="param-hint">只聚类置信度低于此值的图片</span>
+              <span class="param-hint">
+                只聚类置信度低于此值且未标记的图片
+                <a-tag v-if="lowConfEstimate !== null" color="blue" style="margin-left: 8px;">
+                  预估 {{ lowConfEstimate }} 个字符
+                </a-tag>
+              </span>
             </a-form-item>
           </div>
 
@@ -165,7 +171,9 @@
       </a-table-column>
       <a-table-column title="字符数量" width="120">
         <template #default="{ record }">
-          {{ record.labeled_count || 0 }}/{{ record.char_count }}
+          <a-tooltip :title="`已标注 ${record.labeled_count || 0} · 已跳过 ${record.skipped_count || 0} · 剩余 ${record.remaining_count || 0}`">
+            <span>{{ record.labeled_count || 0 }}/{{ record.skipped_count || 0 }}/{{ record.char_count }}</span>
+          </a-tooltip>
         </template>
       </a-table-column>
       <a-table-column title="操作" width="150">
@@ -194,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -219,6 +227,8 @@ const activeClusterId = ref(null)
 
 const data_source = ref('unlabeled')
 const confidence_threshold = ref(0.7)
+const lowConfEstimate = ref(null)
+let confDebounceTimer = null
 
 const method = ref('hdbscan')
 const min_cluster_size = ref(5)
@@ -231,10 +241,27 @@ const formatDate = (dateStr) => {
   return date.toLocaleString('zh-CN')
 }
 
+const onConfidenceThresholdChange = (value) => {
+  if (confDebounceTimer) clearTimeout(confDebounceTimer)
+  confDebounceTimer = setTimeout(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/low-confidence-estimate`, {
+        params: { confidence_threshold: value }
+      })
+      if (res.data.code === 0) {
+        lowConfEstimate.value = res.data.data.count
+      }
+    } catch (e) {
+      console.error('预估字符数失败:', e)
+    }
+  }, 500)
+}
+
 const getStatusColor = (status) => {
   switch (status) {
     case 'labeled': return 'green'
     case 'skipped': return 'red'
+    case 'partial': return 'orange'
     default: return 'default'
   }
 }
@@ -243,6 +270,7 @@ const getStatusText = (status) => {
   switch (status) {
     case 'labeled': return '已标注'
     case 'skipped': return '已跳过'
+    case 'partial': return '部分标注'
     default: return '未标注'
   }
 }
@@ -399,6 +427,14 @@ const refreshData = async () => {
 
 onMounted(() => {
   refreshData()
+})
+
+watch(data_source, (val) => {
+  if (val === 'low_confidence') {
+    onConfidenceThresholdChange(confidence_threshold.value)
+  } else {
+    lowConfEstimate.value = null
+  }
 })
 </script>
 
