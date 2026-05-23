@@ -188,5 +188,5 @@ if __name__ == "__main__":
         datahome_path=PROJECT_ROOT / "bussiness/datahome",
         output_path=PROJECT_ROOT /"bussiness"
     )
-    dataset_name_list = ["pdf01","pdf5823"]
+    dataset_name_list = ["pdf01","pdf5823","pdf5826"]
     collector.run(dataset_name_list)
