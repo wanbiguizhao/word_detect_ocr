@@ -97,6 +97,8 @@ def get_round_info(round_num: int):
             "clusters": clusters.get("clusters", {}),
             "total_clusters": len(clusters.get("clusters", {})),
             "total_chars": clusters.get("total_chars", 0),
+            "clustered_chars": clusters.get("clustered_chars", sum(len(v) for v in clusters.get("clusters", {}).values())),
+            "noise_chars": clusters.get("noise_chars", clusters.get("total_chars", 0) - sum(len(v) for v in clusters.get("clusters", {}).values())),
             "progress": progress
         }
     except HTTPException:

@@ -132,7 +132,7 @@
       <div class="round-info-body">
         <span>描述: {{ currentRound.description }}</span>
         <span>聚类数: {{ currentRound.n_clusters }}</span>
-        <span>字符数: {{ currentRound.total_chars }}</span>
+        <span>字符数: {{ currentRound.clustered_chars ?? currentRound.total_chars }}<span v-if="currentRound.noise_chars > 0" style="color: #999; font-size: 12px;"> (参与: {{ currentRound.total_chars }}, 噪声: {{ currentRound.noise_chars }})</span></span>
         <span v-if="currentRound.confidence_threshold != null">置信度阈值: {{ currentRound.confidence_threshold }}</span>
       </div>
     </div>

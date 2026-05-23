@@ -529,6 +529,8 @@ class MultiClusteringManager:
             "algorithm": method,
             "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
+            "clustered_chars": sum(len(v) for v in clusters.values()),
+            "noise_chars": len(valid_char_ids) - sum(len(v) for v in clusters.values()),
             "created_at": datetime.datetime.now().isoformat(),
             "clusters": clusters,
             "params": {
@@ -573,6 +575,8 @@ class MultiClusteringManager:
             "algorithm": method,
             "n_clusters": n_clusters if method == "kmeans" else len(clusters),
             "total_chars": len(valid_char_ids),
+            "clustered_chars": sum(len(v) for v in clusters.values()),
+            "noise_chars": len(valid_char_ids) - sum(len(v) for v in clusters.values()),
             "description": description or f"第{new_round}轮聚类"
         })
         self._save_json(self.history_path, history)
