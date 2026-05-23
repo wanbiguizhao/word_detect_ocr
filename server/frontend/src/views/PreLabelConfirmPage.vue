@@ -343,18 +343,8 @@ const isSelected = (charId) => {
 
 const getPredictedCharClass = (item) => {
   const classes = []
-  // 只有修改过的字才显示分组颜色
-  if (item.corrected_char) {
-    if (item.groupIndex !== undefined) {
-      if (item.groupIndex % 2 === 0) {
-        classes.push('group-red')
-      } else {
-        classes.push('group-yellow')
-      }
-    }
-  }
-  // 保持modified-char的标识
-  if (item.corrected_char) {
+  if (item.corrected_char && item.corrected_char !== item.predicted_char) {
+    classes.push('group-red')
     classes.push('modified-char')
   }
   return classes.join(' ')
