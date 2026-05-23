@@ -437,6 +437,19 @@ def get_sync_statistics():
     }
 
 
+@router.post("/api/labeling/repair-prelabel-status")
+def repair_prelabel_status():
+    """修复 prelabel_status.json 中缺失的记录"""
+    dataset = config.get("dataset.current", "pdf5826")
+    store = DataStore(dataset)
+    result = store.repair_prelabel_status()
+    return {
+        "code": 0,
+        "msg": f"修复了 {result['repaired_count']} 条缺失记录",
+        "data": result
+    }
+
+
 # ==================== 修改/撤回/跳过操作接口 ====================
 
 @router.post("/api/labeling/modify")

@@ -453,6 +453,53 @@ class DataStore:
         self._save_file(self.prelabel_status_path, self._prelabel_status)
         self._prelabel_status_dirty = False
     
+    def repair_prelabel_status(self) -> dict:
+        """修复 prelabel_status.json 中缺失的记录
+        
+        将 unified_labels.json 中已标注(labeled)但 prelabel_status.json 中
+        没有对应记录的字符，补充为 confirmed 状态。
+        """
+        prelabel_status = self._load_file(self.prelabel_status_path, default={"status": {}, "corrected_chars": {}})
+        status_map = prelabel_status.get("status", {})
+        
+        annotations = self.get_unified_labels()
+        dataset_annotations = [a for a in annotations if a.get("dataset") == self.dataset_id or not a.get("dataset")]
+        labeled_char_ids = {a.get("char_id") for a in dataset_annotations if a.get("status") == "labeled" and a.get("char_id")}
+        
+        all_prelabel_char_ids = set()
+        for p in self._prelabels_list:
+            cid = p.get("char_id")
+            if cid:
+                all_prelabel_char_ids.add(cid)
+        
+        missing_confirmed = labeled_char_ids & all_prelabel_char_ids - set(status_map.keys())
+        
+        if missing_confirmed:
+            if "status" not in prelabel_status:
+                prelabel_status["status"] = {}
+            if "corrected_chars" not in prelabel_status:
+                prelabel_status["corrected_chars"] = {}
+            
+            char_id_to_char = {}
+            for a in dataset_annotations:
+                if a.get("char_id") in missing_confirmed:
+                    char_id_to_char[a.get("char_id")] = a.get("char")
+            
+            for char_id in missing_confirmed:
+                prelabel_status["status"][char_id] = "confirmed"
+                char = char_id_to_char.get(char_id)
+                if char:
+                    prelabel_status["corrected_chars"][char_id] = char
+            
+            prelabel_status["updated_at"] = datetime.datetime.now().isoformat()
+            self._save_file(self.prelabel_status_path, prelabel_status)
+            self._prelabel_status = prelabel_status
+            self._invalidate_dataset_cache()
+            
+            logger.info(f"[repair_prelabel_status] 修复了 {len(missing_confirmed)} 条缺失的 confirmed 记录")
+        
+        return {"repaired_count": len(missing_confirmed)}
+
     def get_prelabel_stats(self) -> dict:
         """获取预标注统计"""
         if not self.prelabels_path.exists():
@@ -933,20 +980,21 @@ class DataStore:
         status_map = prelabel_status.get("status", {})
         skipped_count = sum(1 for v in status_map.values() if v == "skipped")
         skipped_char_ids = {cid for cid, v in status_map.items() if v == "skipped"}
-        
-        # pending = 有预标 且 未被标注 且 未被跳过
-        # 所有有预标的图片 = pre_labels.json 中的所有条目
+        confirmed_char_ids = {cid for cid, v in status_map.items() if v == "confirmed"}
+
         all_prelabel_char_ids = set()
         for p in self._prelabels_list:
             cid = p.get("char_id")
             if cid:
                 all_prelabel_char_ids.add(cid)
-        
-        pending_char_ids = all_prelabel_char_ids - labeled_char_ids - skipped_char_ids
+
+        pending_char_ids = all_prelabel_char_ids - labeled_char_ids - skipped_char_ids - confirmed_char_ids
         pending_count = len(pending_char_ids)
-        
-        # unlabeled = 完全没有预标（一般应接近 0）
-        unlabeled_count = total_images - labeled_count - pending_count - skipped_count
+
+        confirmed_not_in_labeled = confirmed_char_ids - labeled_char_ids
+        effective_labeled_count = len(labeled_char_ids | confirmed_char_ids)
+
+        unlabeled_count = total_images - effective_labeled_count - pending_count - skipped_count
         
         # 逐字统计
         char_stats = {}
@@ -972,14 +1020,19 @@ class DataStore:
             if char and char in char_stats:
                 char_stats[char]["labeled"] += 1
                 char_stats[char]["unlabeled"] = max(0, char_stats[char]["unlabeled"] - 1)
-        
+
+        for char_id in confirmed_not_in_labeled:
+            char = char_id_to_char.get(char_id)
+            if char and char in char_stats:
+                char_stats[char]["labeled"] += 1
+                char_stats[char]["unlabeled"] = max(0, char_stats[char]["unlabeled"] - 1)
+
         for char_id in skipped_char_ids:
             char = char_id_to_char.get(char_id)
             if char and char in char_stats:
                 char_stats[char]["skipped"] += 1
                 char_stats[char]["unlabeled"] = max(0, char_stats[char]["unlabeled"] - 1)
-        
-        # 标记 pending 状态（有预标但未被覆盖的）
+
         for char_id in pending_char_ids:
             char = char_id_to_char.get(char_id)
             if char and char in char_stats and char_stats[char]["unlabeled"] > 0:
@@ -989,7 +1042,7 @@ class DataStore:
         return {
             "dataset": self.dataset_id,
             "total_images": total_images,
-            "labeled_count": labeled_count,
+            "labeled_count": effective_labeled_count,
             "pending_count": pending_count,
             "skipped_count": skipped_count,
             "unlabeled_count": unlabeled_count,
