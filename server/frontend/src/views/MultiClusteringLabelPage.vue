@@ -143,14 +143,18 @@ const selectionEnd = ref({ x: 0, y: 0 })
 const selectedIndices = ref([])
 
 const displayImages = computed(() => {
+  const statusOrder = (img) => {
+    if (img.char_status === 'skipped') return 1
+    if (img.label) return 2
+    return 0
+  }
+
   const sorted = [...images.value].sort((a, b) => {
-    const aHasLabel = !!a.label
-    const bHasLabel = !!b.label
-    
-    if (aHasLabel && !bHasLabel) return 1
-    if (!aHasLabel && bHasLabel) return -1
-    
-    if (aHasLabel && bHasLabel) {
+    const aOrder = statusOrder(a)
+    const bOrder = statusOrder(b)
+    if (aOrder !== bOrder) return aOrder - bOrder
+
+    if (aOrder === 2 && bOrder === 2) {
       const labelCounts = {}
       images.value.forEach(img => {
         if (img.label) {
@@ -159,12 +163,10 @@ const displayImages = computed(() => {
       })
       const aCount = labelCounts[a.label] || 0
       const bCount = labelCounts[b.label] || 0
-      if (aCount !== bCount) {
-        return aCount - bCount
-      }
+      if (aCount !== bCount) return aCount - bCount
       return a.label.localeCompare(b.label)
     }
-    
+
     return 0
   })
 
