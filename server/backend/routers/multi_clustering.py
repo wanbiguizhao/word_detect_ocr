@@ -211,6 +211,25 @@ def get_cluster_detail(round_num: int, cluster_id: str):
             char_id = char_info.get("char_id", "")
             char_status = all_chars.get(char_id, {}).get("status", "unlabeled")
 
+            line_name = char_info.get("line_name", "")
+            col_start = char_info.get("col_start", 0)
+            col_end = char_info.get("col_end", 0)
+
+            if (not line_name or col_start == 0 or col_end == 0) and char_id in all_chars:
+                lineage_info = all_chars[char_id]
+                if not line_name:
+                    line_name = lineage_info.get("line_name", "")
+                if col_start == 0:
+                    col_start = lineage_info.get("col_start", 0)
+                if col_end == 0:
+                    col_end = lineage_info.get("col_end", 0)
+            
+            if not line_name and char_id:
+                import re
+                m = re.match(r'(page_\d+_line_\d+)_char_\d+', char_id)
+                if m:
+                    line_name = m.group(1)
+
             prelabel = manager.data_store.get_prelabel_by_char_id(char_id)
             predicted_char = None
             confidence = None
@@ -223,9 +242,9 @@ def get_cluster_detail(round_num: int, cluster_id: str):
             char_details.append({
                 "index": idx,
                 "char_id": char_id,
-                "line_name": char_info.get("line_name", ""),
-                "col_start": char_info.get("col_start", 0),
-                "col_end": char_info.get("col_end", 0),
+                "line_name": line_name,
+                "col_start": col_start,
+                "col_end": col_end,
                 "label": char_label.get("char"),
                 "labeled_at": char_label.get("labeled_at"),
                 "char_status": char_status,
@@ -261,7 +280,18 @@ def save_cluster_label(round_num: int, cluster_id: str, body: LabelItem):
 
         if success:
             print(f"[API] save_cluster_label 成功")
-            return {"code": 0, "msg": "保存成功"}
+            response = {"code": 0, "msg": "保存成功"}
+            
+            if body.char:
+                from datastore.data_store import DataStore
+                store = DataStore(manager.dataset_id)
+                new_chars_info = store.detect_new_chars([body.char], compare_mode="global")
+                if new_chars_info.get("new_chars_count", 0) > 0:
+                    response["new_chars_info"] = new_chars_info
+                    new_chars_str = "、".join(new_chars_info["new_chars"])
+                    response["msg"] += f"\n🎉 新发现汉字：{new_chars_str}"
+            
+            return response
         else:
             print(f"[API] save_cluster_label 返回False")
             raise HTTPException(status_code=500, detail="保存失败")
@@ -281,11 +311,23 @@ def batch_save_cluster_labels(round_num: int, cluster_id: str, body: BatchLabelS
         manager = MultiClusteringManager()
         saved_count = manager.save_batch_labels(round_num, cluster_id, body.labels)
 
-        return {
+        response = {
             "code": 0,
             "msg": f"批量保存成功，共 {saved_count} 条",
             "saved_count": saved_count
         }
+        
+        chars_to_check = list(set(item.char for item in body.labels if item.char))
+        if chars_to_check:
+            from datastore.data_store import DataStore
+            store = DataStore(manager.dataset_id)
+            new_chars_info = store.detect_new_chars(chars_to_check, compare_mode="global")
+            if new_chars_info.get("new_chars_count", 0) > 0:
+                response["new_chars_info"] = new_chars_info
+                new_chars_str = "、".join(new_chars_info["new_chars"])
+                response["msg"] += f"\n🎉 新发现 {new_chars_info['new_chars_count']} 个汉字：{new_chars_str}"
+        
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

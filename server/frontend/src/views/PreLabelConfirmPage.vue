@@ -195,11 +195,27 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { message } from 'ant-design-vue'
+import { message, notification } from 'ant-design-vue'
 
 const route = useRoute()
 const router = useRouter()
 const char = decodeURIComponent(route.params.char)
+
+const showNewCharsNotification = (newCharsInfo) => {
+  if (!newCharsInfo || newCharsInfo.new_chars_count === 0) return
+  
+  const chars = newCharsInfo.new_chars.join('、')
+  const detail = Object.entries(newCharsInfo.new_chars_detail || {})
+    .map(([c, info]) => `${c}(当前数据集${info.count_in_dataset}张)`)
+    .join('，')
+  
+  notification.success({
+    message: `🎉 新发现 ${newCharsInfo.new_chars_count} 个汉字！`,
+    description: `新汉字：${chars}\n${detail}\n全局已知汉字数：${newCharsInfo.global_known}`,
+    duration: 8,
+    style: { whiteSpace: 'pre-line' }
+  })
+}
 
 const loading = ref(false)
 const prelabels = ref([])
@@ -256,31 +272,27 @@ const sortedPrelabels = computed(() => {
   // 展开并添加分组索引，同时计算显示优先级
   const result = []
   sortedGroups.forEach(([char, items], groupIndex) => {
-    // 组内按置信度由低到高排序
     const sortedItems = items.sort((a, b) => a.confidence - b.confidence)
-    // 给每个项目添加分组索引和显示优先级
     sortedItems.forEach(item => {
-      // 显示优先级：0=待确认，1=预测错误（已修正），2=预测正确
-      let sortPriority
+      let statusPriority
       if (item.status === 'pending') {
-        sortPriority = 0
-      } else if (item.corrected_char) {
-        sortPriority = 1
+        statusPriority = 0
+      } else if (item.status === 'skipped') {
+        statusPriority = 1
       } else {
-        sortPriority = 2
+        statusPriority = 2
       }
       result.push({
         ...item,
         groupIndex,
-        sortPriority
+        statusPriority
       })
     })
   })
   
-  // 按优先级排序：先按显示优先级，再按分组索引，最后按置信度
   result.sort((a, b) => {
-    if (a.sortPriority !== b.sortPriority) {
-      return a.sortPriority - b.sortPriority
+    if (a.statusPriority !== b.statusPriority) {
+      return a.statusPriority - b.statusPriority
     }
     if (a.groupIndex !== b.groupIndex) {
       return a.groupIndex - b.groupIndex
@@ -500,6 +512,10 @@ const confirmBatch = async () => {
           }
         })
         message.success(`✓ 批量确认成功！已确认 ${successCount} 个标注`)
+        
+        if (res.data.new_chars_info) {
+          showNewCharsNotification(res.data.new_chars_info)
+        }
       } else {
         message.warning('批量确认失败，无标注被确认')
       }
@@ -703,9 +719,8 @@ const showLineContext = async (item) => {
     const lineUrl = `/api/line-images/${encodeURIComponent(lineName)}`
 
     let charLeft = 0
-    let charRight = 100
+    let charRight = 0
     
-    // 先尝试获取位置信息
     if (item.lineage) {
       charLeft = item.lineage.col_start || 0
       if (item.lineage.col_end !== undefined) {
@@ -715,12 +730,9 @@ const showLineContext = async (item) => {
       }
     }
 
-    // 如果没有位置信息，从char_id估算
-    if (charLeft === 0 && charRight === 100) {
-      const charIndexMatch = item.char_id.match(/_char_(\d+)/)
-      const charIndex = charIndexMatch ? parseInt(charIndexMatch[1]) : 0
-      charLeft = charIndex * 60
-      charRight = charLeft + 60
+    if (!charLeft || !charRight) {
+      alert('无法获取字符位置信息：血缘关系文件中缺少坐标数据')
+      return
     }
 
     const response = await fetch(lineUrl)

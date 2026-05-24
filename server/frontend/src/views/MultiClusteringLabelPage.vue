@@ -117,7 +117,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, notification } from 'ant-design-vue'
 import axios from 'axios'
 
 const route = useRoute()
@@ -202,21 +202,24 @@ const getImageUrl = (charId) => {
 }
 
 const showLineContext = async (img) => {
-  if (!img.line_name) {
-    alert('无法获取行信息：缺少行名称')
-    return
-  }
-
-  const lineName = img.line_name
-  const lineUrl = `/api/line-images/${encodeURIComponent(lineName)}`
-
-  let charLeft = img.col_start
-  let charRight = img.col_end
-
-  const match = img.char_id.match(/page_(\d+)_line_(\d+)_char_(\d+)/)
-  const charIndex = match ? parseInt(match[3]) : 0
-
   try {
+    const match = img.char_id.match(/^(page_\d+_line_\d+)_char_\d+/)
+    if (!match) {
+      alert('无法获取行信息：char_id格式不正确')
+      return
+    }
+
+    const lineName = img.line_name || match[1]
+    const lineUrl = `/api/line-images/${encodeURIComponent(lineName)}`
+
+    const charLeft = img.col_start
+    const charRight = img.col_end
+
+    if (!charLeft || !charRight) {
+      alert('无法获取字符位置信息：血缘关系文件中缺少坐标数据')
+      return
+    }
+
     const response = await fetch(lineUrl)
     
     if (!response.ok) {
@@ -227,15 +230,9 @@ const showLineContext = async (img) => {
     const blob = await response.blob()
     const bitmap = await createImageBitmap(blob)
 
-    if (charLeft === undefined) {
-      const avgCharWidth = Math.floor(bitmap.width / 30)
-      charLeft = charIndex * avgCharWidth
-      charRight = charLeft + avgCharWidth
-    }
-
     const extend = 50
     const cropLeft = Math.max(0, charLeft - extend)
-    const cropRight = Math.min(bitmap.width, (charRight || charLeft + 30) + extend)
+    const cropRight = Math.min(bitmap.width, charRight + extend)
     const cropWidth = cropRight - cropLeft
 
     const canvas = document.createElement('canvas')
@@ -254,13 +251,11 @@ const showLineContext = async (img) => {
     ctx.lineTo(leftLineX, bitmap.height)
     ctx.stroke()
     
-    if (charRight !== undefined) {
-      const rightLineX = charRight - cropLeft
-      ctx.beginPath()
-      ctx.moveTo(rightLineX, 0)
-      ctx.lineTo(rightLineX, bitmap.height)
-      ctx.stroke()
-    }
+    const rightLineX = charRight - cropLeft
+    ctx.beginPath()
+    ctx.moveTo(rightLineX, 0)
+    ctx.lineTo(rightLineX, bitmap.height)
+    ctx.stroke()
 
     lineContextImage.value = canvas.toDataURL('image/png')
     showLineModal.value = true
@@ -391,17 +386,37 @@ const updatePendingLabel = (index, event) => {
   pendingLabels.value[index] = event.target.value
 }
 
+const showNewCharsNotification = (newCharsInfo) => {
+  if (!newCharsInfo || newCharsInfo.new_chars_count === 0) return
+  
+  const chars = newCharsInfo.new_chars.join('、')
+  const detail = Object.entries(newCharsInfo.new_chars_detail || {})
+    .map(([char, info]) => `${char}(当前数据集${info.count_in_dataset}张)`)
+    .join('，')
+  
+  notification.success({
+    message: `🎉 新发现 ${newCharsInfo.new_chars_count} 个汉字！`,
+    description: `新汉字：${chars}\n${detail}\n全局已知汉字数：${newCharsInfo.global_known}`,
+    duration: 8,
+    style: { whiteSpace: 'pre-line' }
+  })
+}
+
 const saveLabel = async (img) => {
   const label = pendingLabels.value[img.index]
   if (!label) return
 
   try {
-    await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels`, {
+    const res = await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels`, {
       charIndex: img.index,
       char: label
     })
     img.label = label
     delete pendingLabels.value[img.index]
+    
+    if (res.data.new_chars_info) {
+      showNewCharsNotification(res.data.new_chars_info)
+    }
   } catch (err) {
     console.error('保存标签失败:', err)
     message.error(err.response?.data?.detail || '保存失败')
@@ -418,7 +433,7 @@ const saveAll = async () => {
       char: batchChar.value
     }))
 
-    await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels/batch`, {
+    const res = await axios.post(`/api/mc/rounds/${round.value}/clusters/${clusterId.value}/labels/batch`, {
       labels
     })
 
@@ -431,6 +446,11 @@ const saveAll = async () => {
     pendingLabels.value = {}
     selectedIndices.value = []
     batchChar.value = ''
+    
+    if (res.data.new_chars_info) {
+      showNewCharsNotification(res.data.new_chars_info)
+    }
+    
     await loadData()
   } catch (err) {
     console.error('批量保存失败:', err)
