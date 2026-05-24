@@ -959,6 +959,132 @@ class DataStore:
             if key in self._last_modified:
                 del self._last_modified[key]
     
+    # ==================== 新汉字发现 ====================
+
+    def get_known_chars(self) -> set:
+        """获取当前数据集已知的所有汉字集合（已标注过的汉字）"""
+        annotations = self.get_unified_labels()
+        known = set()
+        for a in annotations:
+            char = a.get("char")
+            if char and a.get("status") == "labeled":
+                known.add(char)
+        return known
+
+    @staticmethod
+    def get_all_known_chars_across_datasets() -> dict:
+        """
+        获取所有数据集的已知汉字集合
+        
+        Returns:
+            {
+                "global_known": {"中", "国", ...},  # 全局已知汉字集合
+                "dataset_chars": {                   # 各数据集已知汉字
+                    "pdf5823": {"中", "国", ...},
+                    "pdf5826": {"人", "民", ...},
+                }
+            }
+        """
+        project_root = Path(__file__).parent.parent.parent.parent
+        datahome = project_root / "bussiness" / "datahome"
+        
+        global_known = set()
+        dataset_chars = {}
+        
+        if datahome.exists():
+            for ds_dir in sorted(datahome.iterdir()):
+                if not ds_dir.is_dir():
+                    continue
+                ul_path = ds_dir / "unified_labels.json"
+                if not ul_path.exists():
+                    continue
+                try:
+                    with open(ul_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    chars = set()
+                    for a in data.get("annotations", []):
+                        if a.get("status") == "labeled" and a.get("char"):
+                            chars.add(a["char"])
+                    dataset_chars[ds_dir.name] = chars
+                    global_known.update(chars)
+                except Exception:
+                    pass
+        
+        return {
+            "global_known": global_known,
+            "dataset_chars": dataset_chars
+        }
+
+    def detect_new_chars(self, chars_to_check: list, compare_mode: str = "global") -> dict:
+        """
+        检测新发现的汉字，支持跨数据集对比
+        
+        Args:
+            chars_to_check: 待检查的汉字列表
+            compare_mode: 对比模式
+                - "global": 与所有数据集的已知汉字对比（默认）
+                - "dataset": 仅与当前数据集的已知汉字对比
+                - "other": 与其他数据集对比（排除当前数据集）
+            
+        Returns:
+            {
+                "new_chars": ["龘", "犇"],
+                "new_chars_count": 2,
+                "compare_mode": "global",
+                "current_dataset": "pdf5826",
+                "current_dataset_known": 510,
+                "global_known": 1290,
+                "new_chars_detail": {
+                    "龘": {"count_in_dataset": 3, "count_in_global": 3, "first_seen_dataset": "pdf5826"},
+                    "犇": {"count_in_dataset": 1, "count_in_global": 1, "first_seen_dataset": "pdf5826"}
+                }
+            }
+        """
+        current_known = self.get_known_chars()
+        
+        if compare_mode == "dataset":
+            known_chars = current_known
+        elif compare_mode == "other":
+            all_info = DataStore.get_all_known_chars_across_datasets()
+            other_known = set()
+            for ds, chars in all_info["dataset_chars"].items():
+                if ds != self.dataset_id:
+                    other_known.update(chars)
+            known_chars = other_known
+        else:
+            all_info = DataStore.get_all_known_chars_across_datasets()
+            known_chars = all_info["global_known"]
+            current_known = all_info["dataset_chars"].get(self.dataset_id, current_known)
+        
+        new_chars = set()
+        new_chars_detail = {}
+        
+        for char in chars_to_check:
+            if char and char not in known_chars:
+                new_chars.add(char)
+        
+        for char in new_chars:
+            char_prelabels = self._char_to_prelabels.get(char, [])
+            count = len(char_prelabels)
+            first_id = char_prelabels[0] if char_prelabels else None
+            new_chars_detail[char] = {
+                "count_in_dataset": count,
+                "first_char_id": first_id,
+                "first_seen_dataset": self.dataset_id
+            }
+        
+        all_info = DataStore.get_all_known_chars_across_datasets()
+        
+        return {
+            "new_chars": sorted(list(new_chars)),
+            "new_chars_count": len(new_chars),
+            "compare_mode": compare_mode,
+            "current_dataset": self.dataset_id,
+            "current_dataset_known": len(current_known),
+            "global_known": len(all_info["global_known"]),
+            "new_chars_detail": new_chars_detail
+        }
+
     # ==================== 统计数据 ====================
     
     def get_statistics(self) -> dict:

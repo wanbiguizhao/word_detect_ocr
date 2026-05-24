@@ -275,11 +275,18 @@ def batch_save_cluster_labels(body: BatchLabelSave):
             json.dump(unified_data, f, ensure_ascii=False, indent=2)
 
     new_chars_list = sorted(list(new_chars))
+    
+    from datastore.data_store import DataStore
+    from config import DATASET_ID
+    store = DataStore(DATASET_ID)
+    new_chars_info = store.detect_new_chars([item.char for item in body.labels if item.char], compare_mode="global")
+
     return {
         "code": 0,
         "msg": f"保存成功，共 {len(body.labels)} 条",
         "new_chars_count": len(new_chars_list),
-        "new_chars": new_chars_list
+        "new_chars": new_chars_list,
+        "new_chars_info": new_chars_info if new_chars_info.get("new_chars_count", 0) > 0 else None
     }
 
 
