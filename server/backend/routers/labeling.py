@@ -8,7 +8,7 @@ from pathlib import Path
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-from config import config, PROJECT_ROOT
+from config import config, PROJECT_ROOT, DATASET_ID
 from labeling_task_manager import LabelingTaskManager
 from simple_char_clustering import SimpleCharClustering
 from datastore.stats_manager import StatsManager
@@ -98,7 +98,7 @@ class BatchModifyRequest(BaseModel):
 
 @router.get("/api/labeling/stats", response_model=DatasetStats)
 def get_labeling_stats(refresh: bool = False):
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     stats_manager = StatsManager(dataset)
     
     if refresh:
@@ -139,7 +139,7 @@ def get_labeling_stats(refresh: bool = False):
 def get_char_list(page: int = 1, page_size: int = 20, search: Optional[str] = None, 
                   dataset: Optional[str] = None, sort_by: Optional[str] = None, sort_order: str = "desc"):
     if dataset is None:
-        dataset = config.get("dataset.current", "pdf5826")
+        dataset = DATASET_ID
     stats_manager = StatsManager(dataset)
     return stats_manager.get_char_list(page, page_size, search, sort_by, sort_order)
 
@@ -149,7 +149,7 @@ def get_char_prelabels(char: str, page: int = 1, page_size: int = 20,
                        confidence_min: Optional[float] = None, dataset: Optional[str] = None):
     """使用新的 DataStore 获取预标注数据"""
     if dataset is None:
-        dataset = config.get("dataset.current", "pdf5826")
+        dataset = DATASET_ID
     
     store = DataStore(dataset)
     prelabels = store.get_prelabels_by_char(char)
@@ -176,7 +176,7 @@ def get_char_prelabels(char: str, page: int = 1, page_size: int = 20,
 
 @router.post("/api/labeling/confirm")
 def simple_confirm(request: SimpleConfirmRequest):
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     stats_manager = StatsManager(dataset)
     stats_manager.confirm_annotation(request.char_id, request.char)
 
@@ -200,8 +200,10 @@ def batch_confirm(request: BatchConfirmRequest):
     except Exception as e:
         logger.warning(f"[Labeling Router] Failed to log request items: {e}")
     
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     logger.debug(f"[Labeling Router] Current dataset: {dataset}")
+    
+    chars_to_check = list(set(item.char for item in request.items if item.char))
     
     stats_manager = StatsManager(dataset)
     logger.debug(f"[Labeling Router] StatsManager initialized with dataset: {stats_manager.dataset_id}")
@@ -209,12 +211,24 @@ def batch_confirm(request: BatchConfirmRequest):
     results = stats_manager.batch_confirm_annotations(request.items)
     logger.info(f"[Labeling Router] Batch confirm completed - success: {results['success_count']}/{results['total_count']}")
 
-    return {
+    new_chars_info = {}
+    if chars_to_check:
+        store = DataStore(dataset)
+        new_chars_info = store.detect_new_chars(chars_to_check, compare_mode="global")
+
+    response = {
         "code": 0,
         "msg": f"成功确认 {results['success_count']}/{results['total_count']} 个标注",
         "success_count": results['success_count'],
         "total_count": results['total_count']
     }
+    
+    if new_chars_info.get("new_chars_count", 0) > 0:
+        response["new_chars_info"] = new_chars_info
+        new_chars_str = "、".join(new_chars_info["new_chars"])
+        response["msg"] += f"\n🎉 新发现 {new_chars_info['new_chars_count']} 个汉字：{new_chars_str}"
+    
+    return response
 
 
 @router.post("/api/labeling/prelabels/confirm")
@@ -269,7 +283,7 @@ def skip_prelabels(image_paths: List[str]):
 
 @router.get("/api/labeling/clusters")
 def get_clusters(method: str = "simple_char"):
-    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{config.get('dataset.current')}_clusters.json"
+    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{DATASET_ID}_clusters.json"
     
     if not cluster_path.exists():
         return {"code": 0, "data": [], "method": method}
@@ -286,7 +300,7 @@ def get_clusters(method: str = "simple_char"):
 
 @router.get("/api/labeling/clusters/{cluster_id}")
 def get_cluster_detail(cluster_id: str, method: str = "simple_char"):
-    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{config.get('dataset.current')}_clusters.json"
+    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{DATASET_ID}_clusters.json"
     
     if not cluster_path.exists():
         raise HTTPException(status_code=404, detail="聚类数据不存在")
@@ -308,7 +322,7 @@ def get_cluster_detail(cluster_id: str, method: str = "simple_char"):
 
 @router.post("/api/labeling/clusters/{cluster_id}/label")
 def label_cluster(cluster_id: str, char: str, image_indices: Optional[List[int]] = None, method: str = "simple_char"):
-    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{config.get('dataset.current')}_clusters.json"
+    cluster_path = PROJECT_ROOT / "bussiness" / "cluster_results" / method / f"{DATASET_ID}_clusters.json"
     
     if not cluster_path.exists():
         raise HTTPException(status_code=404, detail="聚类数据不存在")
@@ -374,7 +388,7 @@ def run_clustering(min_samples: int = 3):
 def get_label_history(char_id: Optional[str] = None, limit: int = 100, dataset: Optional[str] = None):
     """获取标注历史记录"""
     if dataset is None:
-        dataset = config.get("dataset.current", "pdf5826")
+        dataset = DATASET_ID
     
     stats_manager = StatsManager(dataset)
     history = stats_manager.get_label_history(char_id, limit)
@@ -392,7 +406,7 @@ def get_label_history(char_id: Optional[str] = None, limit: int = 100, dataset: 
 @router.get("/api/labeling/sync/logs")
 def get_sync_logs(limit: int = 100, date: Optional[str] = None):
     """获取同步日志"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     if date:
@@ -411,7 +425,7 @@ def get_sync_logs(limit: int = 100, date: Optional[str] = None):
 @router.get("/api/labeling/sync/logs/today")
 def get_today_sync_logs():
     """获取今日同步日志"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     logs = store.get_today_sync_logs()
     
@@ -426,7 +440,7 @@ def get_today_sync_logs():
 @router.get("/api/labeling/sync/stats")
 def get_sync_statistics():
     """获取同步统计信息"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     stats = store.get_sync_statistics()
     
@@ -440,7 +454,7 @@ def get_sync_statistics():
 @router.post("/api/labeling/repair-prelabel-status")
 def repair_prelabel_status():
     """修复 prelabel_status.json 中缺失的记录"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     result = store.repair_prelabel_status()
     return {
@@ -455,7 +469,7 @@ def repair_prelabel_status():
 @router.post("/api/labeling/modify")
 def modify_annotation(request: ModifyAnnotationRequest):
     """修改预标注（直接修改prelabel_status）"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -480,7 +494,7 @@ def modify_annotation(request: ModifyAnnotationRequest):
 @router.post("/api/labeling/revoke")
 def revoke_annotation(request: SimpleRevokeRequest):
     """撤回已确认的标注"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -504,7 +518,7 @@ def revoke_annotation(request: SimpleRevokeRequest):
 @router.post("/api/labeling/skip")
 def skip_prelabel(request: SimpleSkipRequest):
     """跳过单个预标注"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -527,7 +541,7 @@ def skip_prelabel(request: SimpleSkipRequest):
 @router.post("/api/labeling/skip/batch")
 def batch_skip_prelabels(request: BatchSkipRequest):
     """批量跳过预标注"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -550,7 +564,7 @@ def batch_skip_prelabels(request: BatchSkipRequest):
 @router.post("/api/labeling/unskip")
 def unskip_prelabel(request: SimpleUnskipRequest):
     """取消跳过预标注"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -573,7 +587,7 @@ def unskip_prelabel(request: SimpleUnskipRequest):
 @router.post("/api/labeling/unskip/batch")
 def batch_unskip_prelabels(request: BatchUnskipRequest):
     """批量取消跳过预标注"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:
@@ -595,7 +609,7 @@ def batch_unskip_prelabels(request: BatchUnskipRequest):
 @router.post("/api/labeling/modify/batch")
 def batch_modify_annotations(request: BatchModifyRequest):
     """批量修改标注（优化版，减少文件IO次数）"""
-    dataset = config.get("dataset.current", "pdf5826")
+    dataset = DATASET_ID
     store = DataStore(dataset)
     
     try:

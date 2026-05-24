@@ -53,8 +53,13 @@ config = ConfigManager()
 BASE_DIR = Path(__file__).parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 
-DATASET_ID = config.get("dataset.current", "pdf5826")
-SOURCE_DATASET_ID = config.get("dataset.source", "pdf01")
+DATASET_ID = config.get("dataset.current")
+if DATASET_ID is None:
+    raise ValueError("配置缺失: dataset.current 未在 config.json 中设置，请检查配置文件")
+
+SOURCE_DATASET_ID = config.get("dataset.source")
+if SOURCE_DATASET_ID is None:
+    raise ValueError("配置缺失: dataset.source 未在 config.json 中设置，请检查配置文件")
 
 DATAHOME_DIR = PROJECT_ROOT / "bussiness" / "datahome"
 DATASET_DIR = DATAHOME_DIR / DATASET_ID

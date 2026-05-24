@@ -1,8 +1,14 @@
 """将统一标注反向同步到预标注"""
 import json
+import sys
 from pathlib import Path
 
-def sync_unified_to_prelabels(dataset_id: str = "pdf5826"):
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import DATASET_ID
+
+def sync_unified_to_prelabels(dataset_id: str = None):
+    if dataset_id is None:
+        dataset_id = DATASET_ID
     project_root = Path("d:/projects/word_detect_ocr")
     dataset_dir = project_root / "bussiness" / "datahome" / dataset_id
     
@@ -67,4 +73,4 @@ def sync_unified_to_prelabels(dataset_id: str = "pdf5826"):
     print("   - 已确认跳过: {}".format(skipped_count))
 
 if __name__ == "__main__":
-    sync_unified_to_prelabels("pdf5826")
+    sync_unified_to_prelabels()

@@ -1,10 +1,10 @@
 {
   "dataset": {
-    "current": "pdf5826",
+    "current": "pdf5824",
     "source": "pdf01"
   },
   "labeling": {
-    "high_confidence_threshold": 0.9,
+    "high_confidence_threshold": 0.95,
     "low_confidence_threshold": 0.7
   },
   "clustering": {

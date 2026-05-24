@@ -3,12 +3,14 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+from config import DATASET_ID
+
 logger = logging.getLogger(__name__)
 
 class LabelingTaskManager:
     def __init__(self, config):
         self.config = config
-        self.dataset_id = config.get("dataset.current", "pdf5826")
+        self.dataset_id = DATASET_ID
 
         self.project_root = Path(__file__).parent.parent.parent
         self.datahome_dir = self.project_root / "bussiness" / "datahome"

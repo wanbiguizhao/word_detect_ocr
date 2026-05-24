@@ -12,7 +12,10 @@ class StatsManager:
     def __new__(cls, dataset_id: Optional[str] = None):
         if cls._instance is None or (dataset_id and cls._instance.dataset_id != dataset_id):
             cls._instance = super().__new__(cls)
-            cls._instance.dataset_id = dataset_id or "pdf5826"
+            if dataset_id is None:
+                from config import DATASET_ID
+                dataset_id = DATASET_ID
+            cls._instance.dataset_id = dataset_id
             cls._instance.data_store = DataStore(cls._instance.dataset_id)
         return cls._instance
     

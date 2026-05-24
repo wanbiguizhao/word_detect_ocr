@@ -3,10 +3,14 @@
 
 import json
 import argparse
+import sys
 from pathlib import Path
 from collections import defaultdict
 import shutil
 from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import DATASET_ID
 
 class DataSync:
     def __init__(self, dataset_id: str, dry_run=False, backup=True):
@@ -347,7 +351,7 @@ class DataSync:
 
 def main():
     parser = argparse.ArgumentParser(description="数据同步脚本（安全模式）")
-    parser.add_argument("--dataset", "-d", default="pdf5826", help="数据集ID")
+    parser.add_argument("--dataset", "-d", default=DATASET_ID, help="数据集ID")
     parser.add_argument("--all", "-a", action="store_true", help="同步所有数据集")
     parser.add_argument("--dry-run", "-n", action="store_true", help="模拟运行，不实际修改文件")
     parser.add_argument("--no-backup", action="store_true", help="不备份文件")

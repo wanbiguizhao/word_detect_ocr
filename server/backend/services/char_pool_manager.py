@@ -7,7 +7,10 @@ from typing import List, Set, Dict, Optional
 class CharPoolManager:
     """字符池管理器 - 完全独立于现有聚类系统"""
     
-    def __init__(self, dataset_id: str = "pdf5826"):
+    def __init__(self, dataset_id: str = None):
+        if dataset_id is None:
+            from config import DATASET_ID
+            dataset_id = DATASET_ID
         self.dataset_id = dataset_id
         # 项目根目录: d:\projects\word_detect_ocr
         self.project_root = Path(__file__).parent.parent.parent.parent

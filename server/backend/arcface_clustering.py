@@ -5,11 +5,13 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 import cv2
 
+from config import DATASET_ID, SOURCE_DATASET_ID
+
 class ArcFaceClustering:
     def __init__(self, config):
         self.config = config
-        self.dataset_id = config.get("dataset.current", "pdf5826")
-        self.source_dataset_id = config.get("dataset.source", "pdf01")
+        self.dataset_id = DATASET_ID
+        self.source_dataset_id = SOURCE_DATASET_ID
         
         self.project_root = Path(__file__).parent.parent.parent
         self.datahome_dir = self.project_root / "bussiness" / "datahome"
