@@ -236,7 +236,7 @@ def generate_prelabels(dataset_name: str, output_dir: str = None, regenerate: bo
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="生成预标注数据")
-    parser.add_argument("--dataset", type=str, default="pdf5826", help="数据集名称")
+    parser.add_argument("--dataset", type=str, default="pdf5824", help="数据集名称")
     parser.add_argument("--output-dir", type=str, default=None, help="输出目录，默认输出到数据集目录下")
     parser.add_argument("--regenerate", action="store_true", help="重新生成（覆盖已有结果）")
 

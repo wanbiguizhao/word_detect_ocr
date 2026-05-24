@@ -971,8 +971,8 @@ def run_segment(data_base_path, pdf_path):
 if __name__ == "__main__":
 
     base_dir = Path(__file__).resolve().parent.parent
-    data_base_path = base_dir / "bussiness"/"datahome"/ "pdf5823"
-    pdf_path = data_base_path / "gwyb195823.pdf"
+    data_base_path = base_dir / "bussiness"/"datahome"/ "pdf5824"
+    pdf_path = data_base_path / "gwyb195824.pdf"
     run_segment(data_base_path, pdf_path)
     # print("\n" + "=" * 60)
     # print("开始聚类")

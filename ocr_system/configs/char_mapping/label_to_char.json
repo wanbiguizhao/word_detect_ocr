@@ -27181,6 +27181,14 @@
     "6894": {
       "char": "%",
       "status": "custom"
+    },
+    "6895": {
+      "char": "",
+      "status": "custom"
+    },
+    "6896": {
+      "char": ".",
+      "status": "custom"
     }
   }
 }
